@@ -1,0 +1,154 @@
+{
+  "identifier": "A1B2C3D4",
+  "nonRenewingSubscriptions": [],
+  "products": [
+    {
+      "displayPrice": "0.99",
+      "familyShareable": false,
+      "internalID": "6990000001",
+      "localizations": [
+        {
+          "description": "A pack of gold, sized to your progress.",
+          "displayName": "Gold Pack",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "com.andreizaharia.abyssdriller.gold.small",
+      "referenceName": "Gold Pack Small",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "1.99",
+      "familyShareable": false,
+      "internalID": "6990000002",
+      "localizations": [
+        {
+          "description": "A big pack of gold, sized to your progress.",
+          "displayName": "Big Gold Pack",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "com.andreizaharia.abyssdriller.gold.medium",
+      "referenceName": "Gold Pack Medium",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "3.99",
+      "familyShareable": false,
+      "internalID": "6990000003",
+      "localizations": [
+        {
+          "description": "A huge pack of gold, sized to your progress.",
+          "displayName": "Huge Gold Pack",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "com.andreizaharia.abyssdriller.gold.large",
+      "referenceName": "Gold Pack Large",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "2.99",
+      "familyShareable": false,
+      "internalID": "6990000004",
+      "localizations": [
+        {
+          "description": "Every run pays twice, forever.",
+          "displayName": "Double Gold",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "com.andreizaharia.abyssdriller.doublegold",
+      "referenceName": "Double Gold",
+      "type": "NonConsumable"
+    },
+    {
+      "displayPrice": "1.99",
+      "familyShareable": false,
+      "internalID": "6990000005",
+      "localizations": [
+        {
+          "description": "Copper paint for your drill. Cosmetic only.",
+          "displayName": "Copper Baron Paint",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "com.andreizaharia.abyssdriller.skin.copper",
+      "referenceName": "Skin Copper Baron",
+      "type": "NonConsumable"
+    },
+    {
+      "displayPrice": "1.99",
+      "familyShareable": false,
+      "internalID": "6990000006",
+      "localizations": [
+        {
+          "description": "Icy paint for your drill. Cosmetic only.",
+          "displayName": "Glacier Rig Paint",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "com.andreizaharia.abyssdriller.skin.glacier",
+      "referenceName": "Skin Glacier Rig",
+      "type": "NonConsumable"
+    },
+    {
+      "displayPrice": "2.99",
+      "familyShareable": false,
+      "internalID": "6990000007",
+      "localizations": [
+        {
+          "description": "Molten paint for your drill. Cosmetic only.",
+          "displayName": "Magma Core Paint",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "com.andreizaharia.abyssdriller.skin.magma",
+      "referenceName": "Skin Magma Core",
+      "type": "NonConsumable"
+    },
+    {
+      "displayPrice": "2.99",
+      "familyShareable": false,
+      "internalID": "6990000008",
+      "localizations": [
+        {
+          "description": "Skip every ad and still get the reward.",
+          "displayName": "Remove Ads",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "com.andreizaharia.abyssdriller.removeads",
+      "referenceName": "Remove Ads",
+      "type": "NonConsumable"
+    },
+    {
+      "displayPrice": "5.99",
+      "familyShareable": false,
+      "internalID": "6990000009",
+      "localizations": [
+        {
+          "description": "Double Gold, No Ads, gold and a paint job.",
+          "displayName": "Mega Bundle",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "com.andreizaharia.abyssdriller.megabundle",
+      "referenceName": "Mega Bundle",
+      "type": "NonConsumable"
+    }
+  ],
+  "settings": {
+    "_applicationInternalID": "6990000000",
+    "_developerTeamID": "NYWAAD7K59",
+    "_failTransactionsEnabled": false,
+    "_locale": "en_US",
+    "_storefront": "USA",
+    "_storeKitErrors": []
+  },
+  "subscriptionGroups": [],
+  "version": {
+    "major": 3,
+    "minor": 0
+  }
+}

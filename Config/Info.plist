@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- AdMob app ID for Abyss Driller (created in AdMob as "Drill Down"). Safe in every build: Debug builds still
+	     request Google's test ad unit (see AdConfig in Core/Ads.swift). The SDK
+	     crashes at launch if this key is missing. -->
+	<key>GADApplicationIdentifier</key>
+	<string>ca-app-pub-8505602361918016~7902195181</string>
+	<!-- Ad networks allowed to attribute installs (SKAdNetwork). Google's own
+	     ID; add your mediation partners' IDs here if you add any. -->
+	<!-- Launch screen: the game's midnight navy (LaunchBackground colour set),
+	     so there is no white flash before the first frame. -->
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIColorName</key>
+		<string>LaunchBackground</string>
+	</dict>
+	<key>SKAdNetworkItems</key>
+	<array>
+		<dict>
+			<key>SKAdNetworkIdentifier</key>
+			<string>cstr6suwn9.skadnetwork</string>
+		</dict>
+	</array>
+</dict>
+</plist>
