@@ -11,7 +11,7 @@ This policy explains what information the Abyss Driller mobile game ("the app", 
 ## 1. Summary
 
 - **No account, no sign-in.** We never ask for your name, email address, phone number or any other contact details.
-- **Your game progress stays on your device.** Gold, best depth, upgrades, Garage parts, Field Guide entries, daily challenge scores and settings are saved only on your device. We do not run servers and we never receive this data.
+- **Your game progress stays with you.** Gold, best depth, upgrades, Garage parts, Field Guide entries and daily challenge scores are saved on your device and, if iCloud is turned on, synced through your own iCloud account so they follow you to your other devices. Settings stay on the device. We do not run servers and we never receive this data.
 - **Ads are provided by Google AdMob.** The only data that leaves your device is what Google's advertising software collects to show the optional rewarded ads, as described in section 3.
 - **Purchases are handled by Apple.** We never see your payment details (section 4).
 - **You are in control.** You can decline ad tracking, change your consent at any time, and delete all game data by deleting the app.
@@ -20,7 +20,7 @@ This policy explains what information the Abyss Driller mobile game ("the app", 
 
 ## 2. Information stored on your device
 
-The app saves the following **locally on your device only** (using Apple's standard on-device storage). It is never sent to us or to anyone else:
+The app saves the following **on your device** (using Apple's standard on-device storage). It is never sent to us. If iCloud is turned on for the app, your game progress (not your settings) is also kept in your own iCloud account through Apple's iCloud key-value storage, so you can continue on another device or after reinstalling. This copy is stored by Apple under its terms; we cannot access it:
 
 | Data | Purpose |
 |---|---|
@@ -29,7 +29,7 @@ The app saves the following **locally on your device only** (using Apple's stand
 | Daily ad counter (free upgrades claimed today) | Applies the daily limit |
 | Settings: steering sensitivity, joystick dead zone, joystick visibility, haptics, screen shake | Remembers your preferences |
 
-This data is removed when you delete the app. If you use iCloud or device backups, it may be included in your own backups under Apple's terms; we have no access to it.
+Deleting the app removes the copy on that device. The iCloud copy stays in your iCloud account until you remove it: in iOS Settings → [your name] → iCloud → Manage Account Storage, or by turning iCloud off for the app before deleting it. It may also be included in your own device backups under Apple's terms; we have no access to any of these.
 
 ---
 
@@ -95,7 +95,7 @@ Depending on where you live, including under the GDPR (EU/UK) and the CCPA/CPRA 
 
 Because we do not collect or store personal data ourselves, the practical controls are:
 
-- **Delete game data:** delete the app from your device.
+- **Delete game data:** delete the app from your device, and remove its data from your iCloud account (iOS Settings → [your name] → iCloud → Manage Account Storage).
 - **Stop ad tracking:** turn off tracking for the app in iOS Settings → Privacy & Security → Tracking.
 - **Change ad consent (EEA/UK/Switzerland):** in the app, open Settings → Privacy choices.
 - **Data held by Google:** manage it at <https://myadcenter.google.com> or contact Google through its privacy policy.
@@ -110,7 +110,7 @@ If you have any questions or want to exercise a right, contact us at the address
 
 ## 8. Security
 
-Game data stays on your device and is protected by your device's own security. Data sent to Google for advertising is transmitted using encrypted connections, under Google's security practices.
+Game data stays on your device, and in your own iCloud account if you use it, protected by Apple's security. Data sent to Google for advertising is transmitted using encrypted connections, under Google's security practices.
 
 ---
 
@@ -121,6 +121,8 @@ We may update this policy, for example if we add new features or partners. The e
 ---
 
 ## 10. Contact
+
+If you email us, for example with **Settings → Report a bug**, we receive your email address and whatever you include (the report form adds your app version, device model and iOS version, which you can see and edit before sending). We use it only to reply and fix problems, and delete it when it is no longer needed.
 
 Andrei Zaharia
 Email: asar.innovations@gmail.com
