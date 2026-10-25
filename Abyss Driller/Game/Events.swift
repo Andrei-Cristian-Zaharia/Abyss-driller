@@ -10,9 +10,9 @@ enum RunEventKind: CaseIterable {
 
     var title: String {
         switch self {
-        case .caveIn: return "CAVE-IN!"
-        case .goldRush: return "MOTHER LODE!"
-        case .darkness: return "LIGHTS OUT"
+        case .caveIn: return String(localized: "CAVE-IN!", bundle: .app, comment: "Event banner: rocks fall")
+        case .goldRush: return String(localized: "MOTHER LODE!", bundle: .app, comment: "Event banner: gold rush")
+        case .darkness: return String(localized: "LIGHTS OUT", bundle: .app, comment: "Event banner: darkness")
         }
     }
 
@@ -73,7 +73,7 @@ extension GameWorld {
             }
             event = active.timeLeft > 0 ? active : nil
             if event == nil {
-                popup("SURVIVED", at: CGPoint(x: x, y: depth - 1), tint: active.kind.tint)
+                popup(String(localized: "SURVIVED", bundle: .app, comment: "Popup when an event ends"), at: CGPoint(x: x, y: depth - 1), tint: active.kind.tint)
             }
             return
         }

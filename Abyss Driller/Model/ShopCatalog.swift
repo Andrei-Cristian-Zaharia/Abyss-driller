@@ -20,8 +20,8 @@ enum ShopCatalog {
         let base = max(1_000, Int((average / 500).rounded(.up)) * 500) * 3
         return [
             GoldPack(id: "gold.small", amount: base, price: "$0.99", tag: nil),
-            GoldPack(id: "gold.medium", amount: base * 5, price: "$1.99", tag: "POPULAR"),
-            GoldPack(id: "gold.large", amount: base * 10, price: "$3.99", tag: "BEST VALUE")
+            GoldPack(id: "gold.medium", amount: base * 5, price: "$1.99", tag: String(localized: "POPULAR", bundle: .app, comment: "Shop badge on a gold pack")),
+            GoldPack(id: "gold.large", amount: base * 10, price: "$3.99", tag: String(localized: "BEST VALUE", bundle: .app, comment: "Shop badge on a gold pack"))
         ]
     }
 

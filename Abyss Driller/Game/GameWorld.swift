@@ -402,7 +402,7 @@ final class GameWorld {
         if armor <= 0 { armor = 1 }
         coast = 0
         phase = .drilling
-        shout("REFUELLED", tint: Palette.mint)
+        shout(String(localized: "REFUELLED", bundle: .app), tint: Palette.mint)
         burstParticles(count: reduceMotion ? 8 : 22, kind: .spark, color: Palette.mint,
                        at: CGPoint(x: x, y: depth), speed: 5)
     }
@@ -500,7 +500,7 @@ final class GameWorld {
         guard gear.shieldRecharge > 0, !shieldReady else { return }
         shieldCharge += dt
         if shieldReady {
-            popup("SHIELD UP", at: CGPoint(x: x, y: depth - 0.9), tint: Palette.window)
+            popup(String(localized: "SHIELD UP", bundle: .app), at: CGPoint(x: x, y: depth - 0.9), tint: Palette.window)
         }
     }
 
@@ -606,7 +606,7 @@ final class GameWorld {
                     repairProgress = 0
                     if armor < loadout.armor {
                         armor += 1
-                        popup("+1 ARMOUR", at: CGPoint(x: x, y: depth - 0.9), tint: Palette.mint, big: true)
+                        popup(String(localized: "+1 ARMOUR", bundle: .app), at: CGPoint(x: x, y: depth - 0.9), tint: Palette.mint, big: true)
                     }
                 }
             }
@@ -614,7 +614,7 @@ final class GameWorld {
             if !recordAnnounced, previousBest > 5, maxDepth > previousBest {
                 recordAnnounced = true
                 recordPulse = 1
-                shout("NEW RECORD", tint: Palette.gold)
+                shout(String(localized: "NEW RECORD", bundle: .app), tint: Palette.gold)
                 Audio.shared.play(.record)
                 Haptics.celebrate()
             }
@@ -653,7 +653,7 @@ final class GameWorld {
                                    at: point, speed: 9)
                     burstParticles(count: reduceMotion ? 3 : 10, kind: .spark,
                                    color: Palette.drillBody, at: point, speed: 7)
-                    popup("SMASH", at: point, tint: Palette.drillBody)
+                    popup(String(localized: "SMASH", bundle: .app, comment: "Popup: a rock or critter was smashed"), at: point, tint: Palette.drillBody)
                     if !reduceMotion { shake = max(shake, 0.45) }
                     Haptics.bump()
                 } else {
@@ -700,7 +700,7 @@ final class GameWorld {
         fuel = min(loadout.fuelCapacity, fuel + Self.nearMissFuel * (1 + min(3, Double(daredevil))))
         burstParticles(count: reduceMotion ? 3 : 9, kind: .spark, color: Palette.textPrimary,
                        at: CGPoint(x: x, y: depth), speed: 4)
-        popup(daredevil > 0 ? "DAREDEVIL!" : "CLOSE!", at: CGPoint(x: x, y: depth - 0.6), tint: Palette.window)
+        popup(daredevil > 0 ? String(localized: "DAREDEVIL!", bundle: .app, comment: "Near-miss popup with the Daredevil perk") : String(localized: "CLOSE!", bundle: .app, comment: "Near-miss popup"), at: CGPoint(x: x, y: depth - 0.6), tint: Palette.window)
         Audio.shared.play(.nearMiss, volume: 0.8)
         Haptics.tap()
         bumpCombo(at: CGPoint(x: x, y: depth))
@@ -752,7 +752,7 @@ final class GameWorld {
         if shieldReady {
             shieldCharge = 0
             invuln = max(invuln, 0.8)
-            popup("BLOCKED", at: CGPoint(x: x, y: depth - 0.9), tint: Palette.window, big: true)
+            popup(String(localized: "BLOCKED", bundle: .app, comment: "Popup: the bit blocked a shot"), at: CGPoint(x: x, y: depth - 0.9), tint: Palette.window, big: true)
             Audio.shared.play(.block)
             burstParticles(count: reduceMotion ? 6 : 18, kind: .spark, color: Palette.window,
                            at: CGPoint(x: x, y: depth), speed: 6)
@@ -768,11 +768,11 @@ final class GameWorld {
             secondWindsUsed += 1
             armor = 1
             invuln = 2.5
-            shout("SECOND WIND", tint: Palette.hazard)
+            shout(String(localized: "SECOND WIND", bundle: .app, comment: "Perk name, shouted when it saves the drill"), tint: Palette.hazard)
             Haptics.celebrate()
         }
         if combo >= Self.comboStep {
-            popup("COMBO LOST", at: CGPoint(x: x, y: depth - 0.9), tint: Palette.hazard)
+            popup(String(localized: "COMBO LOST", bundle: .app), at: CGPoint(x: x, y: depth - 0.9), tint: Palette.hazard)
         }
         combo = 0
         overdriveBase = 0
@@ -817,7 +817,7 @@ final class GameWorld {
                 fuel = min(loadout.fuelCapacity, fuel + Self.fuelCanAmount)
                 burstParticles(count: reduceMotion ? 4 : 14, kind: .spark, color: Palette.mint,
                                at: point, speed: 4.5)
-                popup("+FUEL", at: point, tint: Palette.mint)
+                popup(String(localized: "+FUEL", bundle: .app), at: point, tint: Palette.mint)
                 Haptics.bump()
                 Audio.shared.play(.ore, volume: 0.8)
                 bumpCombo(at: point)
@@ -836,7 +836,7 @@ final class GameWorld {
                                at: point, speed: 3.5)
                 if gain < value {
                     // Something cheaper got thrown out to make room.
-                    popup("SWAP +\(gain)", at: point, tint: Palette.window)
+                    popup(String(localized: "SWAP +\(gain)", bundle: .app, comment: "Popup: a better ore replaced a worse one in the hold"), at: point, tint: Palette.window)
                     burstParticles(count: reduceMotion ? 2 : 6, kind: .chunk, color: Palette.goldShadow,
                                    at: CGPoint(x: x, y: depth), speed: 4)
                 } else {
@@ -856,7 +856,7 @@ final class GameWorld {
                 fuel = min(loadout.fuelCapacity, fuel + Self.overflowFuel)
                 burstParticles(count: reduceMotion ? 3 : 8, kind: .spark, color: Palette.exhaust,
                                at: point, speed: 3)
-                popup("SMELT +FUEL", at: point, tint: Palette.exhaust)
+                popup(String(localized: "SMELT +FUEL", bundle: .app, comment: "Popup: ore that did not fit the hold was burned for fuel"), at: point, tint: Palette.exhaust)
                 Haptics.tap()
                 Audio.shared.play(.ore, volume: 0.5)
                 bumpCombo(at: point)
@@ -901,7 +901,7 @@ final class GameWorld {
         let bonus = currentLayer.goldValue * 3 * comboMultiplier
         coins += bonus
         treasureFlash = max(treasureFlash, 0.45)
-        popup("TRAIL +\(bonus)", at: CGPoint(x: point.x, y: point.y - 0.8), tint: Palette.gold, big: true)
+        popup(String(localized: "TRAIL +\(bonus)", bundle: .app, comment: "Popup: bonus for collecting a whole trail of coins"), at: CGPoint(x: point.x, y: point.y - 0.8), tint: Palette.gold, big: true)
         burstParticles(count: reduceMotion ? 6 : 20, kind: .spark, color: Palette.gold,
                        at: point, speed: 5.5)
         Haptics.celebrate()
@@ -913,7 +913,7 @@ final class GameWorld {
         bestCombo = max(bestCombo, combo)
         comboTimer = comboWindowNow
         if comboMultiplier > before {
-            popup("x\(comboMultiplier) GOLD", at: CGPoint(x: x, y: depth - 1.4),
+            popup(String(localized: "x\(comboMultiplier) GOLD", bundle: .app, comment: "Popup: combo gold multiplier"), at: CGPoint(x: x, y: depth - 1.4),
                   tint: Palette.drillBody, big: true)
             Haptics.bump()
             Audio.shared.comboStep(comboMultiplier)
@@ -923,7 +923,7 @@ final class GameWorld {
 
     private func startOverdrive() {
         overdrive = overdriveTimeNow
-        shout("OVERDRIVE!", tint: Palette.drillBody)
+        shout(String(localized: "OVERDRIVE!", bundle: .app), tint: Palette.drillBody)
         Audio.shared.play(.overdrive)
         if !reduceMotion { shake = max(shake, 0.6) }
         burstParticles(count: reduceMotion ? 10 : 36, kind: .spark, color: Palette.drillBody,
@@ -944,7 +944,7 @@ final class GameWorld {
             // A chest ignores the hold limit — it is the reward for going deep.
             coins += chamber.reward
             treasureFlash = 1
-            shout("TREASURE  +\(chamber.reward)", tint: Palette.gold)
+            shout(String(localized: "TREASURE  +\(chamber.reward)", bundle: .app), tint: Palette.gold)
             Audio.shared.play(.treasure)
             for _ in 0..<(reduceMotion ? 4 : 12) {
                 launchToCounter(from: CGPoint(x: chamber.x + fx.double(-0.6...0.6),
@@ -1236,8 +1236,8 @@ final class GameWorld {
     func noteSighting(_ subject: BestiaryEntry.Subject, at point: CGPoint) {
         let key = BestiaryEntry.key(subject)
         guard bestiarySeen.insert(key).inserted, !knownBestiary.contains(key) else { return }
-        let name = BestiaryEntry.all.first { $0.id == key }?.name.uppercased() ?? "?"
-        popup("NEW ENTRY: \(name)", at: CGPoint(x: point.x, y: point.y - 1), tint: Palette.paper, big: true)
+        let name = BestiaryEntry.all.first { $0.id == key }?.name.localizedUppercase ?? "?"
+        popup(String(localized: "NEW ENTRY: \(name)", bundle: .app, comment: "Popup: a new Field Guide entry was discovered"), at: CGPoint(x: point.x, y: point.y - 1), tint: Palette.paper, big: true)
     }
 
     func noteBossKill(_ kind: BossKind) {
@@ -1414,7 +1414,7 @@ final class GameWorld {
     func chillDrill(_ seconds: Double) {
         guard !gear.chillImmune, stacks(.thermalCore) == 0, !inOverdrive else { return }
         if chill <= 0 {
-            popup("CHILLED!", at: CGPoint(x: x, y: depth - 0.9), tint: Palette.frost, big: true)
+            popup(String(localized: "CHILLED!", bundle: .app), at: CGPoint(x: x, y: depth - 0.9), tint: Palette.frost, big: true)
             Audio.shared.play(.chill)
             burstParticles(count: reduceMotion ? 4 : 12, kind: .spark, color: Palette.frost,
                            at: CGPoint(x: x, y: depth), speed: 4)
@@ -1488,7 +1488,7 @@ final class GameWorld {
     func poisonDrill(_ seconds: Double) {
         guard !gear.poisonImmune, !inOverdrive else { return }
         if poison <= 0 {
-            popup("POISONED!", at: CGPoint(x: x, y: depth - 0.9), tint: Palette.spore, big: true)
+            popup(String(localized: "POISONED!", bundle: .app), at: CGPoint(x: x, y: depth - 0.9), tint: Palette.spore, big: true)
             Audio.shared.play(.poison)
             burstParticles(count: reduceMotion ? 4 : 10, kind: .smoke, color: Palette.spore,
                            at: CGPoint(x: x, y: depth), speed: 3)
@@ -1550,7 +1550,7 @@ final class GameWorld {
                     vx = -dir.x * 7
                     vy = -dir.y * 7
                     stun = max(stun, 0.35)
-                    popup("YANK!", at: CGPoint(x: x, y: depth - 0.8), tint: Palette.toad, big: true)
+                    popup(String(localized: "YANK!", bundle: .app, comment: "Popup: the toad tongue pulled the drill"), at: CGPoint(x: x, y: depth - 0.8), tint: Palette.toad, big: true)
                     poisonDrill(1.6)
                     Haptics.thud()
                 }
@@ -1649,7 +1649,7 @@ final class GameWorld {
                     continue
                 }
                 guard !heatProof else { continue }
-                popup("BURN!", at: CGPoint(x: x, y: depth - 0.8), tint: Palette.lava)
+                popup(String(localized: "BURN!", bundle: .app), at: CGPoint(x: x, y: depth - 0.8), tint: Palette.lava)
                 hurt(amount: 1, away: CGPoint(x: dx, y: dy), chunk: Palette.lava, at: CGPoint(x: x, y: depth))
                 return
             }
@@ -1685,7 +1685,7 @@ final class GameWorld {
                     shots[index].life = 0
                     burstParticles(count: reduceMotion ? 4 : 12, kind: .chunk, color: Palette.rock(hardness: 2),
                                    at: point, speed: 6)
-                    popup("SMASH", at: point, tint: Palette.drillBody)
+                    popup(String(localized: "SMASH", bundle: .app, comment: "Popup: a rock or critter was smashed"), at: point, tint: Palette.drillBody)
                     Haptics.tap()
                     Audio.shared.play(.smash)
                     bumpCombo(at: point)
@@ -1702,7 +1702,7 @@ final class GameWorld {
                 shots[index].life = 0
                 burstParticles(count: reduceMotion ? 3 : 10, kind: .spark, color: Palette.spitter,
                                at: point, speed: 5)
-                popup("BLOCK", at: point, tint: Palette.window)
+                popup(String(localized: "BLOCK", bundle: .app, comment: "Popup: the bit blocked a shot"), at: point, tint: Palette.window)
                 Audio.shared.play(.block)
                 Haptics.tap()
                 bumpCombo(at: point)
@@ -1819,7 +1819,7 @@ final class GameWorld {
                         vx = away.x / length * 4
                         vy = away.y / length * 4
                         stun = max(stun, 0.2)
-                        popup("CLANK", at: segment, tint: Palette.drillBit)
+                        popup(String(localized: "CLANK", bundle: .app, comment: "Sound-effect popup: the bit hit armour"), at: segment, tint: Palette.drillBit)
                         burstParticles(count: reduceMotion ? 2 : 6, kind: .spark, color: Palette.drillBit, at: segment, speed: 4)
                         break
                     }
@@ -2228,7 +2228,7 @@ final class GameWorld {
         }
         // Ancient Ruins: carved blocks and broken pillars buried in the rock.
         // Only drawn from rng in that layer, so shallower terrain is unchanged.
-        if layer.name == "ANCIENT RUINS", rng.chance(0.55) {
+        if layerIndex == Strata.ruins, rng.chance(0.55) {
             decor.append(Decor(id: claimID(), kind: .ruin,
                                x: rng.double(0.6...(Self.shaftWidth - 0.6)),
                                y: bandTop + rng.double(0...Self.bandHeight),
@@ -2237,7 +2237,7 @@ final class GameWorld {
                                seed: rng.next()))
         }
         // Frozen Depths: snow drifts packed into the rock.
-        if layer.name == "FROZEN DEPTHS", rng.chance(0.6) {
+        if layerIndex == Strata.frozen, rng.chance(0.6) {
             decor.append(Decor(id: claimID(), kind: .drift,
                                x: rng.double(0.4...(Self.shaftWidth - 0.4)),
                                y: bandTop + rng.double(0...Self.bandHeight),
@@ -2246,7 +2246,7 @@ final class GameWorld {
                                seed: rng.next()))
         }
         // Spore Hollow: glowing mushrooms sprouting from the rock.
-        if layer.name == "SPORE HOLLOW", rng.chance(0.65) {
+        if layerIndex == Strata.spore, rng.chance(0.65) {
             decor.append(Decor(id: claimID(), kind: .shroom,
                                x: rng.double(0.4...(Self.shaftWidth - 0.4)),
                                y: bandTop + rng.double(0...Self.bandHeight),
@@ -2255,7 +2255,7 @@ final class GameWorld {
                                seed: rng.next()))
         }
         // The Void: stars and faint nebulae glinting in the black rock.
-        if layer.name == "THE VOID" {
+        if layerIndex == Strata.void {
             for _ in 0..<rng.int(2...4) {
                 decor.append(Decor(id: claimID(), kind: .star,
                                    x: rng.double(0.2...(Self.shaftWidth - 0.2)),

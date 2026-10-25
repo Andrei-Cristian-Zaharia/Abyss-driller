@@ -19,7 +19,7 @@ struct HomeView: View {
                              reduceMotion: reduceMotion)
                         .frame(height: 250)
 
-                    PrimaryButton(title: "DRILL!", icon: "arrow.down.circle.fill") {
+                    PrimaryButton(title: String(localized: "DRILL!", bundle: .app), icon: "arrow.down.circle.fill") {
                         app.startRun()
                     }
 
@@ -67,11 +67,11 @@ struct HomeView: View {
                     .background(Capsule().fill(Palette.mint))
             }
             Spacer()
-            CircleIconButton(icon: "questionmark", label: "How to Play") { app.screen = .howToPlay }
-            CircleIconButton(icon: "book.closed.fill", label: "Field Guide",
+            CircleIconButton(icon: "questionmark", label: String(localized: "How to Play", bundle: .app)) { app.screen = .howToPlay }
+            CircleIconButton(icon: "book.closed.fill", label: String(localized: "Field Guide", bundle: .app),
                              badge: app.profile.bestiarySeen.isEmpty == false && app.unreadGuide) { app.openFieldGuide() }
-            CircleIconButton(icon: "gearshape.fill", label: "Settings") { app.screen = .settings }
-            CircleIconButton(icon: "cart.fill", label: "Shop") { app.screen = .shop }
+            CircleIconButton(icon: "gearshape.fill", label: String(localized: "Settings", bundle: .app)) { app.screen = .settings }
+            CircleIconButton(icon: "cart.fill", label: String(localized: "Shop", bundle: .app)) { app.screen = .shop }
         }
     }
 
@@ -80,11 +80,12 @@ struct HomeView: View {
             app.startRun(daily: true)
         } label: {
             tile(icon: "calendar.badge.clock", tint: Palette.gem,
-                 title: "DAILY", subtitle: DailyChallenge.label,
-                 detail: app.todayDailyScore.map { "Best \($0)" } ?? "Same shaft for all")
+                 title: String(localized: "DAILY", bundle: .app, comment: "Daily challenge tile"), subtitle: DailyChallenge.label,
+                 detail: app.todayDailyScore.map { String(localized: "Best \($0)", bundle: .app, comment: "Best daily score") } ?? String(localized: "Same shaft for all", bundle: .app))
         }
         .buttonStyle(SquishButtonStyle())
-        .accessibilityLabel("Daily challenge, \(DailyChallenge.label). " + (app.todayDailyScore.map { "Your score \($0)" } ?? "Not played yet"))
+        .accessibilityLabel(app.todayDailyScore.map { String(localized: "Daily challenge, \(DailyChallenge.label). Your score \($0)", bundle: .app) }
+                            ?? String(localized: "Daily challenge, \(DailyChallenge.label). Not played yet", bundle: .app))
     }
 
     /// The Garage used to hide behind a wrench icon; it gets a proper tile,
@@ -96,12 +97,12 @@ struct HomeView: View {
             Haptics.tap()
         } label: {
             tile(icon: "wrench.and.screwdriver.fill", tint: Palette.drillBody,
-                 title: "GARAGE", subtitle: app.profile.build.bit.title,
-                 detail: unequipped > 0 ? "\(unequipped) spare part\(unequipped == 1 ? "" : "s")" : "Build your rig",
+                 title: String(localized: "GARAGE", bundle: .app), subtitle: app.profile.build.bit.title,
+                 detail: unequipped > 0 ? String(localized: "\(unequipped) spare parts", bundle: .app) : String(localized: "Build your rig", bundle: .app),
                  badge: unequipped > 0)
         }
         .buttonStyle(SquishButtonStyle())
-        .accessibilityLabel("Garage. " + (unequipped > 0 ? "\(unequipped) parts not fitted" : "Build your rig"))
+        .accessibilityLabel(unequipped > 0 ? String(localized: "Garage. \(unequipped) parts not fitted", bundle: .app) : String(localized: "Garage. Build your rig", bundle: .app))
     }
 
     private func tile(icon: String, tint: Color, title: String, subtitle: String, detail: String,
@@ -125,6 +126,8 @@ struct HomeView: View {
                 Text(title)
                     .font(.system(size: 14, weight: .black, design: .rounded))
                     .foregroundStyle(Palette.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
                 Text(subtitle)
                     .font(.system(size: 11.5, weight: .heavy, design: .rounded))
                     .foregroundStyle(tint)
@@ -142,7 +145,7 @@ struct HomeView: View {
 
     private var upgradeSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            SectionHeader(title: "WORKSHOP", icon: "hammer.fill", caption: "Permanent upgrades · no cap")
+            SectionHeader(title: String(localized: "WORKSHOP", bundle: .app), icon: "hammer.fill", caption: String(localized: "Permanent upgrades · no cap", bundle: .app))
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 10),
                                 GridItem(.flexible(), spacing: 10)],
                       spacing: 10) {
@@ -180,8 +183,10 @@ struct UpgradeCard: View {
                         Text(track.title)
                             .font(.system(size: 13, weight: .black, design: .rounded))
                             .foregroundStyle(Palette.textPrimary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
                         if level > track.maxLevel {
-                            Text("LV \(level)")
+                            Text("LV \(level)", comment: "Short for level")
                                 .font(.system(size: 10, weight: .black, design: .rounded))
                                 .foregroundStyle(track.tint)
                         } else {
@@ -205,7 +210,8 @@ struct UpgradeCard: View {
         }
         .buttonStyle(SquishButtonStyle())
         .disabled(price == nil)
-        .accessibilityLabel("\(track.title), level \(level). \(track.nextBenefitText(level: level)). \(price.map { "Costs \($0) gold" } ?? "Fully upgraded")")
+        .accessibilityLabel(price.map { String(localized: "\(track.title), level \(level). \(track.nextBenefitText(level: level)). Costs \($0) gold", bundle: .app) }
+                            ?? String(localized: "\(track.title), level \(level). \(track.nextBenefitText(level: level)). Fully upgraded", bundle: .app))
     }
 
     private var priceTag: some View {
@@ -236,11 +242,11 @@ struct UpgradeCard: View {
                             .padding(.vertical, 3)
                             .background(Capsule().fill(Palette.gold))
                             .padding(.trailing, 6)
-                            .accessibilityLabel(app.adsRemoved ? "Free upgrade available" : "Free with an ad")
+                            .accessibilityLabel(app.adsRemoved ? String(localized: "Free upgrade available", bundle: .app) : String(localized: "Free with an ad", bundle: .app))
                     }
                 }
             } else {
-                Text("MAX")
+                Text("MAX", comment: "Upgrade fully maxed")
                     .font(.system(size: 12, weight: .black, design: .rounded))
                     .foregroundStyle(track.tint)
                     .frame(maxWidth: .infinity)
@@ -274,16 +280,18 @@ private struct AdUpgradeOffer: View {
                     .background(Circle().fill(track.tint))
                     .overlay(Circle().strokeBorder(Palette.ink, lineWidth: 2.5))
                 VStack(spacing: 4) {
-                    Text(app.offerAfterPurchase ? "OUT OF GOLD!" : "NOT ENOUGH GOLD")
+                    Text(app.offerAfterPurchase ? String(localized: "OUT OF GOLD!", bundle: .app) : String(localized: "NOT ENOUGH GOLD", bundle: .app))
                         .font(.system(size: 13, weight: .black, design: .rounded))
                         .foregroundStyle(Palette.gold)
                         .kerning(1)
-                    Text("\(track.title) → LV \(next)")
+                    Text("\(track.title) → LV \(next)", comment: "Upgrade name → new level")
                         .font(.system(size: 24, weight: .black, design: .rounded))
                         .foregroundStyle(Palette.textPrimary)
-                    Text(app.adsRemoved ? "Claim one more upgrade, free. \(app.adUpgradesLeft) left today."
-                         : app.offerAfterPurchase ? "Watch a short ad for one more upgrade, free."
-                                                  : "Watch a short ad to get this upgrade free.")
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                    Text(app.adsRemoved ? String(localized: "Claim one more upgrade, free. \(app.adUpgradesLeft) left today.", bundle: .app)
+                         : app.offerAfterPurchase ? String(localized: "Watch a short ad for one more upgrade, free.", bundle: .app)
+                                                  : String(localized: "Watch a short ad to get this upgrade free.", bundle: .app))
                         .font(.system(size: 13, weight: .semibold, design: .rounded))
                         .foregroundStyle(Palette.textSecondary)
                         .multilineTextAlignment(.center)
@@ -292,13 +300,13 @@ private struct AdUpgradeOffer: View {
                         .foregroundStyle(track.tint)
                         .padding(.top, 2)
                 }
-                PrimaryButton(title: app.watchingAd ? "LOADING AD…" : (app.adsRemoved ? "CLAIM FREE" : "WATCH AD"),
+                PrimaryButton(title: app.watchingAd ? String(localized: "LOADING AD…", bundle: .app) : (app.adsRemoved ? String(localized: "CLAIM FREE", bundle: .app) : String(localized: "WATCH AD", bundle: .app)),
                               icon: app.watchingAd ? "hourglass" : (app.adsRemoved ? "gift.fill" : "play.rectangle.fill"), compact: true) {
                     app.watchAdForUpgrade()
                 }
                 .disabled(app.watchingAd)
                 .opacity(app.watchingAd ? 0.75 : 1)
-                SecondaryButton(title: "NOT NOW") { app.upgradeOffer = nil }
+                SecondaryButton(title: String(localized: "NOT NOW", bundle: .app)) { app.upgradeOffer = nil }
                     .disabled(app.watchingAd)
                 Text("\(app.adUpgradesLeft) of \(AppModel.adUpgradesPerDay) free upgrades left today")
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
@@ -354,7 +362,7 @@ struct MineYard: View {
                 Text("BEST DEPTH")
                     .font(.system(size: 10, weight: .heavy, design: .rounded))
                     .foregroundStyle(Palette.textSecondary)
-                Text("\(bestDepth) m")
+                Text("\(bestDepth) m", comment: "Depth in metres")
                     .font(.system(size: 22, weight: .black, design: .rounded))
                     .foregroundStyle(Palette.gold)
                     .monospacedDigit()

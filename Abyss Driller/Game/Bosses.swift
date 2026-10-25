@@ -20,16 +20,16 @@ nonisolated enum BossKind: CaseIterable, Hashable {
 
     var title: String {
         switch self {
-        case .wormQueen: return "WORM QUEEN"
-        case .batMatriarch: return "BAT MATRIARCH"
-        case .beetleTank: return "BEETLE TANK"
-        case .crystalGolem: return "CRYSTAL GOLEM"
-        case .magmaTitan: return "MAGMA TITAN"
-        case .abyssAngler: return "ABYSS ANGLER"
-        case .stonePharaoh: return "STONE PHARAOH"
-        case .frostWyrm: return "FROST WYRM"
-        case .sporemother: return "SPOREMOTHER"
-        case .starEater: return "STAR EATER"
+        case .wormQueen: return String(localized: "WORM QUEEN", bundle: .app, comment: "Boss name")
+        case .batMatriarch: return String(localized: "BAT MATRIARCH", bundle: .app, comment: "Boss name")
+        case .beetleTank: return String(localized: "BEETLE TANK", bundle: .app, comment: "Boss name")
+        case .crystalGolem: return String(localized: "CRYSTAL GOLEM", bundle: .app, comment: "Boss name")
+        case .magmaTitan: return String(localized: "MAGMA TITAN", bundle: .app, comment: "Boss name")
+        case .abyssAngler: return String(localized: "ABYSS ANGLER", bundle: .app, comment: "Boss name")
+        case .stonePharaoh: return String(localized: "STONE PHARAOH", bundle: .app, comment: "Boss name")
+        case .frostWyrm: return String(localized: "FROST WYRM", bundle: .app, comment: "Boss name")
+        case .sporemother: return String(localized: "SPOREMOTHER", bundle: .app, comment: "Boss name")
+        case .starEater: return String(localized: "STAR EATER", bundle: .app, comment: "Boss name")
         }
     }
 
@@ -141,7 +141,7 @@ struct Boss {
 
     var arenaMid: Double { (arenaTop + arenaBottom) / 2 }
     var radius: Double { kind.radius * (mini ? 0.65 : 1) }
-    var title: String { (mini ? "MINI " : "") + kind.title }
+    var title: String { mini ? String(localized: "MINI \(kind.title)", bundle: .app, comment: "A smaller rematch of a boss; argument is the boss name") : kind.title }
 }
 
 struct BossMine {
@@ -328,7 +328,7 @@ extension GameWorld {
         let enraged = boss.hp * 2 <= boss.maxHP
         if enraged && !boss.enraged {
             boss.enraged = true
-            announce("ENRAGED!", boss)
+            announce(String(localized: "ENRAGED!", bundle: .app, comment: "Boss attack callout"), boss)
             boss.power = 2          // show off the new power straight away
             boss.volleys = 0
             return boss.power
@@ -360,8 +360,8 @@ extension GameWorld {
             if boss.timer <= 0 {
                 switch nextPower(&boss) {
                 case 0: boss.timer = 0.7; announce("!", boss)
-                case 1: boss.timer = 0.6; announce("BURROW!", boss, tint: Palette.worm)
-                default: boss.timer = 0.6; announce("BROOD!", boss, tint: Palette.worm)
+                case 1: boss.timer = 0.6; announce(String(localized: "BURROW!", bundle: .app, comment: "Boss attack callout"), boss, tint: Palette.worm)
+                default: boss.timer = 0.6; announce(String(localized: "BROOD!", bundle: .app, comment: "Boss attack callout"), boss, tint: Palette.worm)
                 }
                 boss.mode = .windup
             }
@@ -461,7 +461,7 @@ extension GameWorld {
                     summonBats(around: boss)
                     boss.timer = patrolGap(boss, base: 1.8)
                 default:
-                    boss.mode = .windup; boss.timer = 0.9; announce("SCREECH!", boss, tint: Palette.batWing)
+                    boss.mode = .windup; boss.timer = 0.9; announce(String(localized: "SCREECH!", bundle: .app, comment: "Boss attack callout"), boss, tint: Palette.batWing)
                 }
             }
         case .windup:
@@ -539,7 +539,7 @@ extension GameWorld {
             burstParticles(count: reduceMotion ? 3 : 8, kind: .smoke, color: Palette.batWing,
                            at: spot, speed: 2)
         }
-        announce("SWARM!", boss, tint: Palette.batWing)
+        announce(String(localized: "SWARM!", bundle: .app, comment: "Boss attack callout"), boss, tint: Palette.batWing)
     }
 
     // MARK: Beetle Tank — charge · rock rain · mines
@@ -556,8 +556,8 @@ extension GameWorld {
             if boss.timer <= 0 {
                 switch nextPower(&boss) {
                 case 0: boss.timer = 0.7; announce("!", boss)
-                case 1: boss.timer = 0.7; announce("ROCK RAIN!", boss, tint: Palette.drillBit)
-                default: boss.timer = 0.5; announce("MINES!", boss)
+                case 1: boss.timer = 0.7; announce(String(localized: "ROCK RAIN!", bundle: .app, comment: "Boss attack callout"), boss, tint: Palette.drillBit)
+                default: boss.timer = 0.5; announce(String(localized: "MINES!", bundle: .app, comment: "Boss attack callout"), boss)
                 }
                 boss.mode = .windup
             }
@@ -577,7 +577,7 @@ extension GameWorld {
                     boss.mode = .recover
                     boss.dazed = 2.0
                     boss.timer = 2.0
-                    announce("DAZED", boss, tint: Palette.window)
+                    announce(String(localized: "DAZED", bundle: .app, comment: "Boss attack callout"), boss, tint: Palette.window)
                     if !reduceMotion { shake = max(shake, 0.7) }
                     Haptics.thud()
                     burstParticles(count: reduceMotion ? 6 : 20, kind: .chunk, color: currentLayer.pebble,
@@ -645,8 +645,8 @@ extension GameWorld {
             if boss.timer <= 0 {
                 switch nextPower(&boss) {
                 case 0: boss.timer = 0.6
-                case 1: boss.timer = 0.8; announce("SHATTER!", boss, tint: Palette.spitter)
-                default: boss.timer = 0.8; announce("SEEKERS!", boss, tint: Palette.spitter)
+                case 1: boss.timer = 0.8; announce(String(localized: "SHATTER!", bundle: .app, comment: "Boss attack callout"), boss, tint: Palette.spitter)
+                default: boss.timer = 0.8; announce(String(localized: "SEEKERS!", bundle: .app, comment: "Boss attack callout"), boss, tint: Palette.spitter)
                 }
                 boss.mode = .windup
             }
@@ -667,13 +667,13 @@ extension GameWorld {
                     let offset = 2.2 + sin(clock * 1.3) * 0.6
                     boss.geysers = [x, x - offset, x + offset].map { min(max($0, 0.9), Self.shaftWidth - 0.9) }
                     boss.timer = 1.0
-                    announce("ERUPTION!", boss, tint: Palette.lava)
+                    announce(String(localized: "ERUPTION!", bundle: .app, comment: "Boss attack callout"), boss, tint: Palette.lava)
                 case 1:
                     boss.timer = 0.7
-                    announce("FIREBALLS!", boss, tint: Palette.lava)
+                    announce(String(localized: "FIREBALLS!", bundle: .app, comment: "Boss attack callout"), boss, tint: Palette.lava)
                 default:
                     boss.timer = 0.6
-                    announce("MAGMA FLOOD!", boss, tint: Palette.lava)
+                    announce(String(localized: "MAGMA FLOOD!", bundle: .app, comment: "Boss attack callout"), boss, tint: Palette.lava)
                 }
                 boss.mode = .windup
             }
@@ -736,8 +736,8 @@ extension GameWorld {
             if boss.timer <= 0 {
                 switch nextPower(&boss) {
                 case 0: boss.timer = 0.8; announce("!", boss)
-                case 1: boss.timer = 0.6; announce("BLACKOUT!", boss, tint: Palette.abyssGlow)
-                default: boss.timer = 0.7; announce("JELLY SWARM!", boss, tint: Palette.jelly)
+                case 1: boss.timer = 0.6; announce(String(localized: "BLACKOUT!", bundle: .app, comment: "Boss attack callout"), boss, tint: Palette.abyssGlow)
+                default: boss.timer = 0.7; announce(String(localized: "JELLY SWARM!", bundle: .app, comment: "Boss attack callout"), boss, tint: Palette.jelly)
                 }
                 boss.mode = .windup
             }
@@ -800,13 +800,13 @@ extension GameWorld {
                 case 0:
                     boss.beamRow = depth
                     boss.timer = 1.15
-                    announce("EYE BEAM!", boss, tint: Palette.jade)
+                    announce(String(localized: "EYE BEAM!", bundle: .app, comment: "Boss attack callout"), boss, tint: Palette.jade)
                 case 1:
                     boss.timer = 0.6
-                    announce("SCARABS!", boss, tint: Palette.scarab)
+                    announce(String(localized: "SCARABS!", bundle: .app, comment: "Boss attack callout"), boss, tint: Palette.scarab)
                 default:
                     boss.timer = 0.8
-                    announce("SANDSTORM!", boss, tint: Palette.pharaoh)
+                    announce(String(localized: "SANDSTORM!", bundle: .app, comment: "Boss attack callout"), boss, tint: Palette.pharaoh)
                 }
                 boss.mode = .windup
             }
@@ -884,9 +884,9 @@ extension GameWorld {
             move(&boss, speed: 3.5 * lap, dt)
             if boss.timer <= 0 {
                 switch nextPower(&boss) {
-                case 0: boss.timer = 0.75; announce("ICE BREATH!", boss, tint: Palette.frost)
-                case 1: boss.timer = 0.6; announce("FROST FIELD!", boss, tint: Palette.frost)
-                default: boss.timer = 0.6; announce("BLIZZARD!", boss, tint: Palette.wisp)
+                case 0: boss.timer = 0.75; announce(String(localized: "ICE BREATH!", bundle: .app, comment: "Boss attack callout"), boss, tint: Palette.frost)
+                case 1: boss.timer = 0.6; announce(String(localized: "FROST FIELD!", bundle: .app, comment: "Boss attack callout"), boss, tint: Palette.frost)
+                default: boss.timer = 0.6; announce(String(localized: "BLIZZARD!", bundle: .app, comment: "Boss attack callout"), boss, tint: Palette.wisp)
                 }
                 boss.mode = .windup
             }
@@ -954,14 +954,14 @@ extension GameWorld {
                 switch nextPower(&boss) {
                 case 0:
                     boss.timer = 0.6
-                    announce("SPORES!", boss, tint: Palette.spore)
+                    announce(String(localized: "SPORES!", bundle: .app, comment: "Boss attack callout"), boss, tint: Palette.spore)
                 case 1:
                     boss.mark = CGPoint(x: x, y: depth)
                     boss.timer = 1.1
-                    announce("ROOT SNARE!", boss, tint: Palette.sporeShadow)
+                    announce(String(localized: "ROOT SNARE!", bundle: .app, comment: "Boss attack callout"), boss, tint: Palette.sporeShadow)
                 default:
                     boss.timer = 0.6
-                    announce("BLOOM!", boss, tint: Palette.mushroomCap)
+                    announce(String(localized: "BLOOM!", bundle: .app, comment: "Boss attack callout"), boss, tint: Palette.mushroomCap)
                 }
                 boss.mode = .windup
             }
@@ -1046,7 +1046,7 @@ extension GameWorld {
                 switch nextPower(&boss) {
                 case 0:
                     boss.timer = 0.6
-                    announce("STARFALL!", boss, tint: Palette.voidGlow)
+                    announce(String(localized: "STARFALL!", bundle: .app, comment: "Boss attack callout"), boss, tint: Palette.voidGlow)
                 case 1:
                     // Open it on the far side of the drill, so the pull drags it away from the boss.
                     let away = CGPoint(x: x - boss.x, y: depth - boss.y)
@@ -1054,12 +1054,12 @@ extension GameWorld {
                     boss.mark = CGPoint(x: min(max(x + away.x / length * 2.2, 1.2), Self.shaftWidth - 1.2),
                                         y: min(max(depth + away.y / length * 2.2, boss.arenaTop + 1.2), boss.arenaBottom - 1.2))
                     boss.timer = 0.9
-                    announce("BLACK HOLE!", boss, tint: Palette.voidGlow)
+                    announce(String(localized: "BLACK HOLE!", bundle: .app, comment: "Boss attack callout"), boss, tint: Palette.voidGlow)
                 default:
                     boss.blinks = 2
                     boss.mark = blinkSpot()
                     boss.timer = 0.6
-                    announce("BLINK!", boss, tint: Palette.starlight)
+                    announce(String(localized: "BLINK!", bundle: .app, comment: "Boss attack callout"), boss, tint: Palette.starlight)
                 }
                 boss.mode = .windup
             }
@@ -1188,7 +1188,7 @@ extension GameWorld {
                 damageBoss()
             } else {
                 // Clank off the armour: knocked back, no harm done.
-                popup("CLANK", at: CGPoint(x: boss.x, y: boss.y - r), tint: Palette.drillBit)
+                popup(String(localized: "CLANK", bundle: .app, comment: "Sound-effect popup: the bit hit armour"), at: CGPoint(x: boss.x, y: boss.y - r), tint: Palette.drillBit)
                 burstParticles(count: reduceMotion ? 3 : 10, kind: .spark, color: Palette.drillBit,
                                at: bit, speed: 5)
                 knockBack(from: CGPoint(x: boss.x, y: boss.y))
@@ -1294,14 +1294,14 @@ extension GameWorld {
         let drop = ShipPart.drop(for: boss.kind)
         let collected = (coresBefore[boss.kind] ?? 0) + bossKindsDefeated.filter { $0 == boss.kind }.count
         if ownedParts.contains(drop) || collected > ShipPart.coresToUnlock {
-            popup("+1 \(boss.kind.title) CORE", at: CGPoint(x: Self.shaftWidth / 2, y: boss.y - 2),
+            popup(String(localized: "+1 \(boss.kind.title) CORE", bundle: .app, comment: "Popup: gained one core from this boss"), at: CGPoint(x: Self.shaftWidth / 2, y: boss.y - 2),
                   tint: boss.kind.tint, big: true)
         } else if collected >= ShipPart.coresToUnlock, collected - 1 < ShipPart.coresToUnlock {
             Audio.shared.play(.unlock)
-            popup("\(drop.title.uppercased()) FOR SALE IN THE GARAGE", at: CGPoint(x: Self.shaftWidth / 2, y: boss.y - 2),
+            popup(String(localized: "\(drop.title.localizedUppercase) FOR SALE IN THE GARAGE", bundle: .app, comment: "Popup: the boss part is now on sale; argument is the part name"), at: CGPoint(x: Self.shaftWidth / 2, y: boss.y - 2),
                   tint: drop.tint, big: true)
         } else if collected < ShipPart.coresToUnlock {
-            popup("CORE \(collected)/\(ShipPart.coresToUnlock) · \(drop.title.uppercased())",
+            popup(String(localized: "CORE \(collected)/\(ShipPart.coresToUnlock) · \(drop.title.localizedUppercase)", bundle: .app, comment: "Popup: boss core progress towards unlocking a part"),
                   at: CGPoint(x: Self.shaftWidth / 2, y: boss.y - 2), tint: boss.kind.tint, big: true)
         }
         let point = CGPoint(x: boss.x, y: boss.y)
@@ -1311,7 +1311,7 @@ extension GameWorld {
         for mine in boss.mines { removeMine(mine.id) }
         armor = min(loadout.armor, armor + 1)
         treasureFlash = 1
-        shout("\(boss.title) DOWN  +\(reward)", tint: Palette.gold)
+        shout(String(localized: "\(boss.title) DOWN  +\(reward)", bundle: .app, comment: "Shout: boss defeated, with the coin reward"), tint: Palette.gold)
         for _ in 0..<(reduceMotion ? 4 : 14) {
             launchToCounter(from: CGPoint(x: point.x + fx.double(-1...1), y: point.y + fx.double(-1...1)),
                             color: Palette.gold, big: fx.chance(0.2))

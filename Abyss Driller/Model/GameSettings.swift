@@ -13,6 +13,8 @@ struct GameSettings: Codable, Equatable {
     var showJoystick = true
     var sound = true
     var music = true
+    /// In-app language (an `AppLanguage.supported` code); nil follows the device.
+    var language: String?
 
     static let sensitivityRange = 0.5...1.8
     static let deadZoneRange = 6.0...40.0
@@ -28,6 +30,7 @@ struct GameSettings: Codable, Equatable {
         showJoystick = try c.decodeIfPresent(Bool.self, forKey: .showJoystick) ?? true
         sound = try c.decodeIfPresent(Bool.self, forKey: .sound) ?? true
         music = try c.decodeIfPresent(Bool.self, forKey: .music) ?? true
+        language = try c.decodeIfPresent(String.self, forKey: .language)
     }
 }
 

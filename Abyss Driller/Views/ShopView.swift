@@ -53,14 +53,14 @@ struct ShopView: View {
     }
 
     private var header: some View {
-        ScreenHeader(title: "SUPPLY DEPOT", onBack: { app.screen = .home }) {
+        ScreenHeader(title: String(localized: "SUPPLY DEPOT", bundle: .app), onBack: { app.screen = .home }) {
             GoldPill(amount: app.profile.gold, compact: true)
         }
     }
 
     private var goldSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionTitle("GOLD PACKS", caption: "Grows with your upgrades")
+            sectionTitle(String(localized: "GOLD PACKS", bundle: .app), caption: String(localized: "Grows with your upgrades", bundle: .app))
             ForEach(ShopCatalog.goldPacks(levels: app.profile.levels)) { pack in
                 Button {
                     if let product = StoreProduct.forGoldPack(pack.id) { app.purchase(product) }
@@ -108,6 +108,8 @@ struct ShopView: View {
                     Text("MEGA BUNDLE")
                         .font(.system(size: 20, weight: .black, design: .rounded))
                         .foregroundStyle(Palette.gold)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
                     Spacer()
                     Text("WORTH \(ShopCatalog.bundleWorth)")
                         .font(.system(size: 10, weight: .black, design: .rounded))
@@ -142,7 +144,7 @@ struct ShopView: View {
         .buttonStyle(SquishButtonStyle())
     }
 
-    private func bundleLine(_ icon: String, _ text: String) -> some View {
+    private func bundleLine(_ icon: String, _ text: LocalizedStringKey) -> some View {
         HStack(spacing: 7) {
             Image(systemName: icon)
                 .font(.system(size: 11, weight: .bold))
@@ -156,7 +158,7 @@ struct ShopView: View {
 
     private var permanentSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionTitle("PERMANENT", caption: "One-time purchase")
+            sectionTitle(String(localized: "PERMANENT", bundle: .app), caption: String(localized: "One-time purchase", bundle: .app))
             permanentRow(icon: "multiply.circle.fill", title: "DOUBLE GOLD", caption: "Every run pays twice, forever",
                          owned: app.profile.doubleGold, product: .doubleGold, fallback: ShopCatalog.doubleGoldPrice)
             permanentRow(icon: "nosign", title: "REMOVE ADS", caption: "Skip every ad, still get the reward",
@@ -164,7 +166,7 @@ struct ShopView: View {
         }
     }
 
-    private func permanentRow(icon: String, title: String, caption: String, owned: Bool,
+    private func permanentRow(icon: String, title: LocalizedStringKey, caption: LocalizedStringKey, owned: Bool,
                               product: StoreProduct, fallback: String) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
@@ -204,7 +206,7 @@ struct ShopView: View {
 
     private var skinSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionTitle("PAINT SHOP", caption: "Cosmetic only — never changes a stat")
+            sectionTitle(String(localized: "PAINT SHOP", bundle: .app), caption: String(localized: "Cosmetic only — never changes a stat", bundle: .app))
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
                     ForEach(DrillSkin.all) { skin in
@@ -246,15 +248,17 @@ private struct SkinCard: View {
                 }
                 .frame(width: 96, height: 84)
 
-                Text(skin.name.uppercased())
+                Text(skin.name.localizedUppercase)
                     .font(.system(size: 11, weight: .black, design: .rounded))
                     .foregroundStyle(Palette.textPrimary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
 
-                Text(selected ? "EQUIPPED" : (owned ? "EQUIP" : StoreProduct.forSkin(skin.id).map { app.store.price($0, fallback: skin.price) } ?? skin.price))
+                Text(selected ? String(localized: "EQUIPPED", bundle: .app) : (owned ? String(localized: "EQUIP", bundle: .app) : StoreProduct.forSkin(skin.id).map { app.store.price($0, fallback: skin.price) } ?? skin.price))
                     .font(.system(size: 11, weight: .black, design: .rounded))
                     .foregroundStyle(selected ? Palette.background : Palette.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
                     .background(Capsule().fill(selected ? Palette.mint : Palette.panelRaised))

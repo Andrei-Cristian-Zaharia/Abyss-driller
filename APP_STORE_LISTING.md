@@ -55,7 +55,7 @@ WHY YOU'LL KEEP DIGGING
 • Workshop upgrades with no level cap
 • Simple one-thumb controls with adjustable sensitivity
 • Charming hand-inked art
-• Optional rewarded ads only, never forced in the middle of a run
+• Ads never interrupt a run, and Remove Ads turns them all off
 • Play anywhere, no account needed
 
 Grab your drill. The Abyss is waiting.
@@ -131,7 +131,7 @@ Everything else: **Not collected**. Purchases are handled by Apple and are not "
 ```
 Abyss Driller needs no account or login. Tap DRILL! on the home screen to start a run: hold anywhere to drill and drag to steer.
 
-Ads: Google AdMob rewarded ads only, always opt-in. They are offered (1) for a fuel refill when the player runs out of fuel during a run, and (2) for a free Workshop upgrade when one is unaffordable (up to 10 per day). No interstitials or banners. Consent (UMP, EEA/UK) and the App Tracking Transparency prompt are shown on first launch before any ad is requested.
+Ads: Google AdMob. Rewarded ads are always opt-in: offered (1) for a fuel refill when the player runs out of fuel during a run, and (2) for a free Workshop upgrade when one is unaffordable (up to 10 per day). One interstitial placement, shown only between runs when leaving the results screen: never during a run, not before the player's 5th run, at most once every 3 runs and 4 minutes apart. No banners. Remove Ads disables all ads. Consent (UMP, EEA/UK) and the App Tracking Transparency prompt are shown on first launch before any ad is requested.
 
 Players who buy Remove Ads (or the Mega Bundle) get both rewards instantly with no video, and the ad SDK is not started for them.
 

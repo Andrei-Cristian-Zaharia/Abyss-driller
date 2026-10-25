@@ -31,6 +31,9 @@ struct ContentView: View {
                     }
                 }
                 .id(app.screen)
+                // Rebuild the screen in a newly picked language: views that
+                // localize through `String(localized:)` don't watch the locale.
+                .id(app.settings.language)
                 .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.97)))
             }
             .animation(.easeInOut(duration: reduceMotion ? 0.15 : 0.25), value: app.screen)
@@ -42,6 +45,7 @@ struct ContentView: View {
                 if phase == .active { Audio.shared.resume() }
             }
             .environment(app)
+            .environment(\.locale, AppLanguage.locale)
         }
         .preferredColorScheme(.dark)
         // Consent → tracking prompt → ad SDK, then keep one rewarded ad ready.

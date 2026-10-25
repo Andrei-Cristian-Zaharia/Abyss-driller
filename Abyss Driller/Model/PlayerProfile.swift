@@ -138,9 +138,9 @@ enum DailyChallenge {
 
     static var label: String {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "d MMM"
-        return formatter.string(from: Date()).uppercased()
+        formatter.locale = AppLanguage.locale
+        formatter.setLocalizedDateFormatFromTemplate("d MMM")
+        return formatter.string(from: Date()).localizedUppercase
     }
 
     static func score(depth: Int, gold: Int) -> Int { depth + gold }

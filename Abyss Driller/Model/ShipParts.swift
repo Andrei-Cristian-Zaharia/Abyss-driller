@@ -8,10 +8,10 @@ enum PartSlot: String, Codable, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .bit: return "BIT"
-        case .hull: return "HULL"
-        case .tracks: return "TRACKS"
-        case .module: return "MODULE"
+        case .bit: return String(localized: "BIT", bundle: .app, comment: "Garage slot name (drill part type)")
+        case .hull: return String(localized: "HULL", bundle: .app, comment: "Garage slot name (drill part type)")
+        case .tracks: return String(localized: "TRACKS", bundle: .app, comment: "Garage slot name (drill part type)")
+        case .module: return String(localized: "MODULE", bundle: .app, comment: "Garage slot name (drill part type)")
         }
     }
 }
@@ -55,34 +55,41 @@ struct PartStats {
     /// Short "+1 Power · 8% slower" style summary.
     var summary: String {
         var parts: [String] = []
-        func pct(_ factor: Double, up: String, down: String) {
-            let delta = Int(((factor - 1) * 100).rounded())
-            if delta > 0 { parts.append("\(delta)% \(up)") } else if delta < 0 { parts.append("\(-delta)% \(down)") }
-        }
-        if power != 0 { parts.append("\(power > 0 ? "+" : "−")\(abs(power)) Power") }
-        if armor != 0 { parts.append("\(armor > 0 ? "+" : "−")\(abs(armor)) armour") }
-        if cargo != 0 { parts.append("+\(cargo) cargo") }
-        if fuel != 0 { parts.append("\(fuel > 0 ? "+" : "−")\(Int(abs(fuel))) fuel") }
-        if bit != 1 { pct(bit, up: "bigger bite", down: "smaller bite") }
-        if killGold != 1 { parts.append("kills pay ×\(String(format: "%g", killGold))") }
-        pct(speed, up: "faster", down: "slower")
-        pct(turn, up: "sharper turns", down: "wider turns")
-        pct(burn, up: "more fuel burn", down: "less fuel burn")
-        if magnet > 0 { parts.append("pulls treasure \(String(format: "%g", magnet)) m") }
-        if killFuel > 0 { parts.append("kills refuel \(String(format: "%g", killFuel))") }
-        if smashFuel > 0 { parts.append("smashes refuel \(String(format: "%g", smashFuel))") }
-        if coreCooldown > 0 { parts.append("shard every \(String(format: "%g", coreCooldown)) s") }
-        if shieldRecharge > 0 { parts.append("blocks a hit every \(Int(shieldRecharge)) s") }
-        if extraDamage > 0 { parts.append("hits cost +\(extraDamage) armour") }
-        if lavaImmune { parts.append("lava-proof") }
-        if noBore { parts.append("rock doesn't slow you") }
-        if seeInDark { parts.append("sees in the dark") }
-        if chillImmune { parts.append("frost-proof") }
-        if poisonImmune { parts.append("poison-proof") }
-        if gravityImmune { parts.append("pull-proof") }
-        if oreBonus != 1 { parts.append("ore worth +\(Int(((oreBonus - 1) * 100).rounded()))%") }
-        if noStun { parts.append("rock hits don't stun") }
-        return parts.isEmpty ? "No changes." : parts.joined(separator: " · ")
+        func pct(_ factor: Double) -> Int { Int(((factor - 1) * 100).rounded()) }
+        func num(_ value: Double) -> String { value.formatted(.number.precision(.fractionLength(0...2))) }
+        let sign = { (value: Int) in value > 0 ? "+" : "−" }
+        if power != 0 { parts.append(String(localized: "\(sign(power))\(abs(power)) Power", bundle: .app, comment: "Part stat: drill Power change, e.g. +1 Power")) }
+        if armor != 0 { parts.append(String(localized: "\(sign(armor))\(abs(armor)) armour", bundle: .app, comment: "Part stat: armour plates change")) }
+        if cargo != 0 { parts.append(String(localized: "+\(cargo) cargo", bundle: .app, comment: "Part stat: extra cargo slots")) }
+        if fuel != 0 { parts.append(String(localized: "\(fuel > 0 ? "+" : "−")\(Int(abs(fuel))) fuel", bundle: .app, comment: "Part stat: fuel tank change")) }
+        let bite = pct(bit)
+        if bite > 0 { parts.append(String(localized: "\(bite)% bigger bite", bundle: .app, comment: "Part stat: the drill bit clears a wider area")) }
+        else if bite < 0 { parts.append(String(localized: "\(-bite)% smaller bite", bundle: .app, comment: "Part stat: the drill bit clears a narrower area")) }
+        if killGold != 1 { parts.append(String(localized: "kills pay ×\(num(killGold))", bundle: .app, comment: "Part stat: gold multiplier for killing creatures")) }
+        let fast = pct(speed)
+        if fast > 0 { parts.append(String(localized: "\(fast)% faster", bundle: .app, comment: "Part stat: drill speed")) }
+        else if fast < 0 { parts.append(String(localized: "\(-fast)% slower", bundle: .app, comment: "Part stat: drill speed")) }
+        let sharp = pct(turn)
+        if sharp > 0 { parts.append(String(localized: "\(sharp)% sharper turns", bundle: .app, comment: "Part stat: turning rate")) }
+        else if sharp < 0 { parts.append(String(localized: "\(-sharp)% wider turns", bundle: .app, comment: "Part stat: turning rate")) }
+        let burnDelta = pct(burn)
+        if burnDelta > 0 { parts.append(String(localized: "\(burnDelta)% more fuel burn", bundle: .app, comment: "Part stat: fuel consumption")) }
+        else if burnDelta < 0 { parts.append(String(localized: "\(-burnDelta)% less fuel burn", bundle: .app, comment: "Part stat: fuel consumption")) }
+        if magnet > 0 { parts.append(String(localized: "pulls treasure \(num(magnet)) m", bundle: .app, comment: "Part stat: magnet range in metres")) }
+        if killFuel > 0 { parts.append(String(localized: "kills refuel \(num(killFuel))", bundle: .app, comment: "Part stat: fuel gained per kill")) }
+        if smashFuel > 0 { parts.append(String(localized: "smashes refuel \(num(smashFuel))", bundle: .app, comment: "Part stat: fuel gained per smashed rock")) }
+        if coreCooldown > 0 { parts.append(String(localized: "shard every \(num(coreCooldown)) s", bundle: .app, comment: "Part stat: fires a crystal shard every N seconds")) }
+        if shieldRecharge > 0 { parts.append(String(localized: "blocks a hit every \(Int(shieldRecharge)) s", bundle: .app, comment: "Part stat: shield recharge time in seconds")) }
+        if extraDamage > 0 { parts.append(String(localized: "hits cost +\(extraDamage) armour", bundle: .app, comment: "Part stat: each hit removes extra armour")) }
+        if lavaImmune { parts.append(String(localized: "lava-proof", bundle: .app, comment: "Part stat: immune to lava")) }
+        if noBore { parts.append(String(localized: "rock doesn't slow you", bundle: .app, comment: "Part stat")) }
+        if seeInDark { parts.append(String(localized: "sees in the dark", bundle: .app, comment: "Part stat")) }
+        if chillImmune { parts.append(String(localized: "frost-proof", bundle: .app, comment: "Part stat: immune to frost slow")) }
+        if poisonImmune { parts.append(String(localized: "poison-proof", bundle: .app, comment: "Part stat: immune to poison")) }
+        if gravityImmune { parts.append(String(localized: "pull-proof", bundle: .app, comment: "Part stat: immune to gravity pulls")) }
+        if oreBonus != 1 { parts.append(String(localized: "ore worth +\(Int(((oreBonus - 1) * 100).rounded()))%", bundle: .app, comment: "Part stat: ore value bonus")) }
+        if noStun { parts.append(String(localized: "rock hits don't stun", bundle: .app, comment: "Part stat")) }
+        return parts.isEmpty ? String(localized: "No changes.", bundle: .app, comment: "Part stat summary when a part changes nothing") : parts.joined(separator: " · ")
     }
 }
 
@@ -109,34 +116,34 @@ enum ShipPart: String, Codable, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .standardBit: return "Standard Bit"
-        case .heavyBit: return "Heavy Bit"
-        case .needleBit: return "Needle Bit"
-        case .glassCannon: return "Glass Cannon"
-        case .twinAuger: return "Twin Auger"
-        case .bulwarkHull: return "Bulwark Hull"
-        case .hoverSkids: return "Hover Skids"
-        case .oreScanner: return "Ore Scanner"
-        case .queenFang: return "Queen's Fang"
-        case .voidDrill: return "Void Drill"
-        case .standardHull: return "Standard Hull"
-        case .lightFrame: return "Light Frame"
-        case .cargoHull: return "Cargo Hull"
-        case .carapace: return "Carapace"
-        case .heatShield: return "Heat Shield"
-        case .pharaohShroud: return "Pharaoh's Shroud"
-        case .standardTracks: return "Standard Tracks"
-        case .sportTracks: return "Sport Tracks"
-        case .overclockTreads: return "Overclock Treads"
-        case .echoWings: return "Echo Wings"
-        case .frostRunners: return "Frost Runners"
-        case .noModule: return "Empty"
-        case .magnetCoil: return "Magnet Coil"
-        case .fuelRecycler: return "Fuel Recycler"
-        case .shieldModule: return "Shield Module"
-        case .crystalCore: return "Crystal Core"
-        case .abyssLantern: return "Abyss Lantern"
-        case .sporeFilter: return "Spore Filter"
+        case .standardBit: return String(localized: "Standard Bit", bundle: .app, comment: "Drill part name")
+        case .heavyBit: return String(localized: "Heavy Bit", bundle: .app, comment: "Drill part name")
+        case .needleBit: return String(localized: "Needle Bit", bundle: .app, comment: "Drill part name")
+        case .glassCannon: return String(localized: "Glass Cannon", bundle: .app, comment: "Drill part name")
+        case .twinAuger: return String(localized: "Twin Auger", bundle: .app, comment: "Drill part name")
+        case .bulwarkHull: return String(localized: "Bulwark Hull", bundle: .app, comment: "Drill part name")
+        case .hoverSkids: return String(localized: "Hover Skids", bundle: .app, comment: "Drill part name")
+        case .oreScanner: return String(localized: "Ore Scanner", bundle: .app, comment: "Drill part name")
+        case .queenFang: return String(localized: "Queen's Fang", bundle: .app, comment: "Drill part name")
+        case .voidDrill: return String(localized: "Void Drill", bundle: .app, comment: "Drill part name")
+        case .standardHull: return String(localized: "Standard Hull", bundle: .app, comment: "Drill part name")
+        case .lightFrame: return String(localized: "Light Frame", bundle: .app, comment: "Drill part name")
+        case .cargoHull: return String(localized: "Cargo Hull", bundle: .app, comment: "Drill part name")
+        case .carapace: return String(localized: "Carapace", bundle: .app, comment: "Drill part name")
+        case .heatShield: return String(localized: "Heat Shield", bundle: .app, comment: "Drill part name")
+        case .pharaohShroud: return String(localized: "Pharaoh's Shroud", bundle: .app, comment: "Drill part name")
+        case .standardTracks: return String(localized: "Standard Tracks", bundle: .app, comment: "Drill part name")
+        case .sportTracks: return String(localized: "Sport Tracks", bundle: .app, comment: "Drill part name")
+        case .overclockTreads: return String(localized: "Overclock Treads", bundle: .app, comment: "Drill part name")
+        case .echoWings: return String(localized: "Echo Wings", bundle: .app, comment: "Drill part name")
+        case .frostRunners: return String(localized: "Frost Runners", bundle: .app, comment: "Drill part name")
+        case .noModule: return String(localized: "Empty", bundle: .app, comment: "Drill part name")
+        case .magnetCoil: return String(localized: "Magnet Coil", bundle: .app, comment: "Drill part name")
+        case .fuelRecycler: return String(localized: "Fuel Recycler", bundle: .app, comment: "Drill part name")
+        case .shieldModule: return String(localized: "Shield Module", bundle: .app, comment: "Drill part name")
+        case .crystalCore: return String(localized: "Crystal Core", bundle: .app, comment: "Drill part name")
+        case .abyssLantern: return String(localized: "Abyss Lantern", bundle: .app, comment: "Drill part name")
+        case .sporeFilter: return String(localized: "Spore Filter", bundle: .app, comment: "Drill part name")
         }
     }
 
@@ -368,10 +375,10 @@ enum ShipPart: String, Codable, CaseIterable, Identifiable {
 
     var starterBlurb: String {
         switch self {
-        case .standardBit: return "Reliable. No surprises."
-        case .standardHull: return "Balanced plating."
-        case .standardTracks: return "Steady steering."
-        default: return "Nothing fitted."
+        case .standardBit: return String(localized: "Reliable. No surprises.", bundle: .app, comment: "Starter part description")
+        case .standardHull: return String(localized: "Balanced plating.", bundle: .app, comment: "Starter part description")
+        case .standardTracks: return String(localized: "Steady steering.", bundle: .app, comment: "Starter part description")
+        default: return String(localized: "Nothing fitted.", bundle: .app, comment: "Starter part description")
         }
     }
 
@@ -389,11 +396,11 @@ enum PartRarity: Int, Comparable, CaseIterable {
 
     var title: String {
         switch self {
-        case .common: return "COMMON"
-        case .uncommon: return "UNCOMMON"
-        case .rare: return "RARE"
-        case .epic: return "EPIC"
-        case .legendary: return "LEGENDARY"
+        case .common: return String(localized: "COMMON", bundle: .app, comment: "Part rarity tier")
+        case .uncommon: return String(localized: "UNCOMMON", bundle: .app, comment: "Part rarity tier")
+        case .rare: return String(localized: "RARE", bundle: .app, comment: "Part rarity tier")
+        case .epic: return String(localized: "EPIC", bundle: .app, comment: "Part rarity tier")
+        case .legendary: return String(localized: "LEGENDARY", bundle: .app, comment: "Part rarity tier")
         }
     }
 

@@ -40,7 +40,7 @@ struct FieldGuideView: View {
                 }
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 14) {
-                    ScreenHeader(title: "FIELD GUIDE", onBack: { app.screen = .home }) {
+                    ScreenHeader(title: String(localized: "FIELD GUIDE", bundle: .app), onBack: { app.screen = .home }) {
                         Text("\(counter.have)/\(counter.total)")
                             .font(.system(size: 15, weight: .black, design: .rounded))
                             .foregroundStyle(Palette.ink)
@@ -91,7 +91,7 @@ struct FieldGuideView: View {
                     withAnimation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.85)) { tab = item }
                     Haptics.tap()
                 } label: {
-                    Label(item == .bosses ? "BOSSES" : item == .perks ? "PERKS" : "CRITTERS",
+                    Label(item == .bosses ? String(localized: "BOSSES", bundle: .app) : item == .perks ? String(localized: "PERKS", bundle: .app) : String(localized: "CRITTERS", bundle: .app),
                           systemImage: item == .bosses ? "crown.fill" : item == .perks ? "star.circle.fill" : "ant.fill")
                         .font(.system(size: 12, weight: .black, design: .rounded))
                         .foregroundStyle(selected ? Palette.ink : Palette.textSecondary)
@@ -122,7 +122,7 @@ struct FieldGuideView: View {
                     .frame(maxWidth: .infinity)
                     .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(layer.soil.opacity(seen ? 0.9 : 0.35)))
                     .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Palette.ink, lineWidth: 2))
-                Text(seen ? entry.name.uppercased() : "???")
+                Text(seen ? entry.name.localizedUppercase : "???")
                     .font(.system(size: 13, weight: .black, design: .rounded))
                     .foregroundStyle(Palette.ink)
                 Text(layer.name)
@@ -136,8 +136,9 @@ struct FieldGuideView: View {
             .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
         }
         .buttonStyle(SquishButtonStyle())
-        .accessibilityLabel(seen ? "\(entry.name), \(layer.name)" : "Undiscovered, \(layer.name)")
-        .accessibilityHint(seen ? "Opens its page" : "Meet it in a run to unlock")
+        .accessibilityLabel(seen ? String(localized: "\(entry.name), \(layer.name)", bundle: .app, comment: "Creature name, biome name")
+                            : String(localized: "Undiscovered, \(layer.name)", bundle: .app, comment: "Biome name"))
+        .accessibilityHint(seen ? Text("Opens its page") : Text("Meet it in a run to unlock"))
     }
 }
 
@@ -156,10 +157,10 @@ private struct PageOverlay: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(entry.name.uppercased())
+                        Text(entry.name.localizedUppercase)
                             .font(.system(size: 22, weight: .black, design: .rounded))
                             .foregroundStyle(Palette.ink)
-                        Text(entry.isBoss ? "BOSS · \(layer.name)" : layer.name)
+                        Text(entry.isBoss ? String(localized: "BOSS · \(layer.name)", bundle: .app, comment: "Biome name") : layer.name)
                             .font(.system(size: 11, weight: .heavy, design: .rounded))
                             .foregroundStyle(Palette.ink.opacity(0.6))
                             .kerning(1)
@@ -192,7 +193,7 @@ private struct PageOverlay: View {
                             .kerning(1)
                         HStack(spacing: 6) {
                             ForEach(Array(entry.powers.enumerated()), id: \.offset) { index, power in
-                                Text(index == 2 ? "\(power) ★" : power)
+                                Text(index == 2 ? "\(power) ★" as String : power)
                                     .font(.system(size: 11.5, weight: .heavy, design: .rounded))
                                     .foregroundStyle(Palette.ink)
                                     .padding(.horizontal, 9)
@@ -221,9 +222,9 @@ private struct PageOverlay: View {
                     Spacer()
                     if let drop = entry.bossDrop {
                         // Boss kills are the cores collected towards its part.
-                        Label(app.profile.owns(drop) ? "\(drop.title) owned"
-                              : kills >= ShipPart.coresToUnlock ? "\(drop.title): for sale in the Garage"
-                              : "\(drop.title): \(kills)/\(ShipPart.coresToUnlock) cores",
+                        Label(app.profile.owns(drop) ? String(localized: "\(drop.title) owned", bundle: .app, comment: "Boss part name")
+                              : kills >= ShipPart.coresToUnlock ? String(localized: "\(drop.title): for sale in the Garage", bundle: .app, comment: "Boss part name")
+                              : String(localized: "\(drop.title): \(kills)/\(ShipPart.coresToUnlock) cores", bundle: .app, comment: "Boss part name, cores collected / needed"),
                               systemImage: drop.icon)
                     }
                 }
@@ -349,7 +350,8 @@ private struct PerkTile: View {
                     .foregroundStyle(Palette.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
-                Text(found ? (perk.maxStacks == 1 ? "ONCE ONLY" : "STACKS") : "PERK")
+                Text(found ? (perk.maxStacks == 1 ? String(localized: "ONCE ONLY", bundle: .app) : String(localized: "STACKS", bundle: .app, comment: "Perk can be taken more than once"))
+                     : String(localized: "PERK", bundle: .app))
                     .font(.system(size: 9.5, weight: .heavy, design: .rounded))
                     .foregroundStyle(Palette.ink.opacity(0.55))
                     .kerning(0.8)
@@ -360,8 +362,10 @@ private struct PerkTile: View {
             .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
         }
         .buttonStyle(SquishButtonStyle())
-        .accessibilityLabel(found ? "\(perk.title.capitalized), \(perk.maxStacks == 1 ? "once only" : "stacks")" : "Undiscovered perk")
-        .accessibilityHint(found ? "Opens its page" : "Shows up the first time a run offers it")
+        .accessibilityLabel(found ? (perk.maxStacks == 1 ? String(localized: "\(perk.title.localizedCapitalized), once only", bundle: .app, comment: "Perk name")
+                                                  : String(localized: "\(perk.title.localizedCapitalized), stacks", bundle: .app, comment: "Perk name; the perk can be taken more than once"))
+                            : String(localized: "Undiscovered perk", bundle: .app))
+        .accessibilityHint(found ? Text("Opens its page") : Text("Shows up the first time a run offers it"))
     }
 }
 
@@ -408,7 +412,7 @@ private struct PerkPage: View {
                         Text(perk.title)
                             .font(.system(size: 22, weight: .black, design: .rounded))
                             .foregroundStyle(Palette.ink)
-                        Text(perk.maxStacks == 1 ? "PERK · ONCE ONLY" : "PERK · STACKS")
+                        Text(perk.maxStacks == 1 ? "PERK · ONCE ONLY" : "PERK · STACKS" as LocalizedStringKey)
                             .font(.system(size: 11, weight: .heavy, design: .rounded))
                             .foregroundStyle(Palette.ink.opacity(0.6))
                             .kerning(1)
@@ -426,13 +430,13 @@ private struct PerkPage: View {
                 }
                 PerkWindow(perk: perk, found: true, iconSize: 72)
                     .frame(height: 170)
-                Text(perk.detail + ".")
+                Text(String(localized: "\(perk.detail).", bundle: .app, comment: "A perk's effect, as a sentence"))
                     .font(.system(size: 15, weight: .bold, design: .rounded))
                     .foregroundStyle(Palette.ink.opacity(0.85))
                     .fixedSize(horizontal: false, vertical: true)
                 Text(perk.maxStacks == 1
-                     ? "You can only take this once per run. After that it stops being offered."
-                     : "Take it again in the same run and its effect grows.")
+                     ? String(localized: "You can only take this once per run. After that it stops being offered.", bundle: .app)
+                     : String(localized: "Take it again in the same run and its effect grows.", bundle: .app))
                     .font(.system(size: 12.5, weight: .semibold, design: .rounded))
                     .foregroundStyle(Palette.ink)
                     .fixedSize(horizontal: false, vertical: true)

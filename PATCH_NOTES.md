@@ -5,6 +5,31 @@ App Store Connect → the version → **What's New in This Version** (4,000 char
 
 ---
 
+## Version 1.2
+
+*(385 characters)* · every language's text is in `whats-new.js`, keyed by App Store Connect locale.
+
+```
+NOW IN YOUR LANGUAGE! 🌍
+Abyss Driller now speaks Română, Español (México), Português (Brasil), Deutsch, Français, 日本語, 한국어 and 简体中文.
+
+PICK YOUR LANGUAGE
+Go to Settings → Language to switch the game's language instantly, or keep it on your device's language.
+
+POLISH
+• Long names and titles now fit on screen in every language
+• Small fixes and improvements
+
+Thanks for digging with us!
+```
+
+### Notes for the release
+- **Add the localizations in App Store Connect** (Romanian, Spanish (Mexico), Portuguese (Brazil), German, French, Japanese, Korean, Chinese (Simplified)) and paste each language's What's New from `whats-new.js`.
+- **Store page:** name, subtitle, description, keywords and screenshots are still English only; untranslated locales fall back to the English listing.
+- **In-app purchase names** are set per language in App Store Connect too.
+
+---
+
 ## Version 1.1
 
 *(1,897 characters)*

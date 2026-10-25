@@ -48,6 +48,7 @@ final class AppModel {
             Audio.shared.musicOn = settings.music
             world?.steerSensitivity = settings.sensitivity
             world?.shakeScale = settings.screenShake ? 1 : 0
+            AppLanguage.apply(settings.language)
         }
     }
 
@@ -57,6 +58,7 @@ final class AppModel {
         Haptics.enabled = settings.haptics
         Audio.shared.soundOn = settings.sound
         Audio.shared.musicOn = settings.music
+        AppLanguage.apply(settings.language)
         store.deliver = { [weak self] product in self?.deliver(product) }
     }
 
@@ -135,6 +137,7 @@ final class AppModel {
         }
         self.result = result
         profile.runsCompleted += 1
+        runsSinceInterstitial += 1
         profile.lifetimeGems += result.gems
 
         if result.isDaily {
@@ -147,7 +150,44 @@ final class AppModel {
     }
 
     func drillAgain() {
-        startRun(daily: pendingDailyRun)
+        leaveResults { [weak self] in
+            guard let self else { return }
+            self.startRun(daily: self.pendingDailyRun)
+        }
+    }
+
+    /// The results screen's Home button.
+    func leaveResultsHome() {
+        leaveResults { [weak self] in self?.goHome() }
+    }
+
+    /// Runs finished since the last interstitial (this launch only, so a
+    /// fresh session always starts with a few ad-free runs).
+    private var runsSinceInterstitial = 0
+
+    /// The only interstitial: on the way out of the results screen, never
+    /// during a run or before the payout is seen. Shown only when all hold:
+    /// no Remove Ads, `interstitialFreeRuns` runs played ever, at least
+    /// `interstitialEveryRuns` runs since the last one, and `interstitialGap`
+    /// since any full-screen ad (a rewarded refill or upgrade counts).
+    /// With no ad loaded it just carries on.
+    private func leaveResults(then next: @escaping () -> Void) {
+        guard !watchingAd else { return }   // a second tap while the ad opens
+        let gapOK = ads.lastAdClosed.map { ContinuousClock.now - $0 >= AdConfig.interstitialGap } ?? true
+        guard !adsRemoved, ads.isSupported,
+              profile.runsCompleted >= AdConfig.interstitialFreeRuns,
+              runsSinceInterstitial >= AdConfig.interstitialEveryRuns,
+              gapOK
+        else {
+            next()
+            return
+        }
+        runsSinceInterstitial = 0
+        watchingAd = true
+        ads.showInterstitial { [weak self] in
+            self?.watchingAd = false
+            next()
+        }
     }
 
     func goHome() {
@@ -177,7 +217,7 @@ final class AppModel {
             guard let self else { return }
             self.watchingAd = false
             world.refuelAndResume()
-            if !watched { self.toast = "NO AD RIGHT NOW · REFILL ON US" }
+            if !watched { self.toast = String(localized: "NO AD RIGHT NOW · REFILL ON US", bundle: .app, comment: "Toast: no ad loaded, fuel refill granted anyway") }
         }
     }
 
@@ -221,7 +261,7 @@ final class AppModel {
         runPhase = .ready
         runOffersRefill = false
         pendingDailyRun = false
-        toast = "PROGRESS RESET"
+        toast = String(localized: "PROGRESS RESET", bundle: .app)
         Haptics.thud()
     }
 
@@ -239,7 +279,7 @@ final class AppModel {
         }
         profile.gold -= price
         profile.levels[track] += 1
-        toast = "\(track.title) → LV \(profile.levels[track])"
+        toast = String(localized: "\(track.title) → LV \(profile.levels[track])", bundle: .app, comment: "Toast: Workshop upgrade bought; LV = level")
         Haptics.celebrate()
         Audio.shared.play(.buy)
         return true
@@ -267,7 +307,7 @@ final class AppModel {
         profile.gold -= price
         profile.ownedParts.insert(part.rawValue)
         profile.build[part.slot] = part
-        toast = "\(part.title.uppercased()) FITTED"
+        toast = String(localized: "\(part.title.localizedUppercase) FITTED", bundle: .app, comment: "Toast: drill part bought and installed")
         Haptics.celebrate()
         Audio.shared.play(.buy)
     }
@@ -291,7 +331,8 @@ final class AppModel {
         profile.gold -= cost.gold
         if let boss = part.droppedBy { profile.bossCores[boss.key, default: 0] -= cost.cores }
         profile.partLevels[part.rawValue] = profile.level(part) + 1
-        toast = "\(part.title.uppercased()) → MK \(String(repeating: "I", count: profile.level(part)))"
+        let mark = String(repeating: "I", count: profile.level(part))
+        toast = String(localized: "\(part.title.localizedUppercase) → MK \(mark)", bundle: .app, comment: "Toast: part upgraded; MK + Roman numeral is the part's mark (I, II, III)")
         Haptics.celebrate()
         Audio.shared.play(.buy)
     }
@@ -345,7 +386,7 @@ final class AppModel {
             guard let self else { return }
             self.watchingAd = false
             guard watched else {
-                self.toast = "NO AD AVAILABLE · TRY AGAIN SOON"
+                self.toast = String(localized: "NO AD AVAILABLE · TRY AGAIN SOON", bundle: .app)
                 return
             }
             self.grantFreeUpgrade(track)
@@ -362,7 +403,7 @@ final class AppModel {
         profile.adUpgradesToday += 1
         profile.levels[track] += 1
         upgradeOffer = nil
-        toast = "\(track.title) → LV \(profile.levels[track]) · FREE"
+        toast = String(localized: "\(track.title) → LV \(profile.levels[track]) · FREE", bundle: .app, comment: "Toast: free Workshop upgrade from an ad; LV = level")
         Haptics.celebrate()
         Audio.shared.play(.buy)
     }
@@ -375,15 +416,15 @@ final class AppModel {
         Task {
             switch await store.purchase(product) {
             case .purchased, .cancelled: break
-            case .pending: toast = "PURCHASE WAITING FOR APPROVAL"
-            case .failed: toast = "PURCHASE DIDN'T GO THROUGH"
+            case .pending: toast = String(localized: "PURCHASE WAITING FOR APPROVAL", bundle: .app)
+            case .failed: toast = String(localized: "PURCHASE DIDN'T GO THROUGH", bundle: .app)
             }
         }
     }
 
     func restorePurchases() {
         Task {
-            toast = await store.restore() ? "PURCHASES RESTORED" : "COULDN'T REACH THE APP STORE"
+            toast = await store.restore() ? String(localized: "PURCHASES RESTORED", bundle: .app) : String(localized: "COULDN'T REACH THE APP STORE", bundle: .app)
         }
     }
 
@@ -393,17 +434,17 @@ final class AppModel {
         if let packID = product.goldPackID,
            let pack = ShopCatalog.goldPacks(levels: profile.levels).first(where: { $0.id == packID }) {
             profile.gold += pack.amount
-            toast = "+\(pack.amount) GOLD"
+            toast = String(localized: "+\(pack.amount) GOLD", bundle: .app, comment: "Toast: gold pack purchased")
             Haptics.celebrate()
             Audio.shared.play(.buy)
         } else if product == .doubleGold, !profile.doubleGold {
             profile.doubleGold = true
-            toast = "DOUBLE GOLD UNLOCKED"
+            toast = String(localized: "DOUBLE GOLD UNLOCKED", bundle: .app)
             Haptics.celebrate()
             Audio.shared.play(.buy)
         } else if product == .removeAds, !profile.adsRemoved {
             profile.adsRemoved = true
-            toast = "NO MORE ADS · REWARDS ARE INSTANT"
+            toast = String(localized: "NO MORE ADS · REWARDS ARE INSTANT", bundle: .app)
             Haptics.celebrate()
             Audio.shared.play(.buy)
         } else if product == .megaBundle {
@@ -411,7 +452,7 @@ final class AppModel {
         } else if let skinID = product.skinID, !profile.ownedSkins.contains(skinID) {
             profile.ownedSkins.insert(skinID)
             profile.selectedSkin = skinID
-            toast = "\(DrillSkin.skin(id: skinID).name.uppercased()) EQUIPPED"
+            toast = String(localized: "\(DrillSkin.skin(id: skinID).name.localizedUppercase) EQUIPPED", bundle: .app, comment: "Toast: paint job bought and applied")
             Haptics.celebrate()
             Audio.shared.play(.buy)
         }
@@ -434,7 +475,7 @@ final class AppModel {
             granted = true
         }
         if granted {
-            toast = "MEGA BUNDLE UNLOCKED"
+            toast = String(localized: "MEGA BUNDLE UNLOCKED", bundle: .app)
             Haptics.celebrate()
             Audio.shared.play(.buy)
         }

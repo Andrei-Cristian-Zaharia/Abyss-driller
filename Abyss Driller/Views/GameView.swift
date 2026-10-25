@@ -137,7 +137,7 @@ struct GameView: View {
         VStack(spacing: 9) {
             ZStack {
                 VStack(spacing: 0) {
-                    Text("\(max(0, Int(world.depth))) m")
+                    Text("\(max(0, Int(world.depth))) m", comment: "Depth in metres")
                         .font(.system(size: 30, weight: .black, design: .rounded))
                         .foregroundStyle(Palette.textPrimary)
                         .monospacedDigit()
@@ -217,6 +217,8 @@ struct GameView: View {
             if world.isDaily {
                 Text("DAILY CHALLENGE · STANDARD RIG")
                     .font(.system(size: 10, weight: .heavy, design: .rounded))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
                     .foregroundStyle(Palette.gem)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
@@ -226,6 +228,8 @@ struct GameView: View {
             if world.cargoFullNotice > 0.05 {
                 Text("HOLD FULL · RICHER ORE SWAPS IN")
                     .font(.system(size: 11, weight: .heavy, design: .rounded))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
                     .foregroundStyle(Palette.hazard)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
@@ -247,12 +251,16 @@ struct GameView: View {
         let overdrive = world.inOverdrive
         let tint = overdrive ? Palette.drillBody : (world.comboMultiplier > 1 ? Palette.gold : Palette.textPrimary)
         return HStack(spacing: 8) {
-            Text(overdrive ? "OVERDRIVE" : "x\(world.comboMultiplier)")
+            Text(overdrive ? String(localized: "OVERDRIVE", bundle: .app) : String(localized: "x\(world.comboMultiplier)", bundle: .app, comment: "Combo gold multiplier"))
                 .font(.system(size: overdrive ? 14 : 18, weight: .black, design: .rounded))
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
                 .foregroundStyle(tint)
             VStack(alignment: .leading, spacing: 3) {
                 Text("COMBO \(world.combo)")
                     .font(.system(size: 10, weight: .heavy, design: .rounded))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
                     .foregroundStyle(Palette.textSecondary)
                     .monospacedDigit()
                 GeometryReader { proxy in
@@ -273,7 +281,7 @@ struct GameView: View {
         )
         .opacity(0.35 + 0.65 * min(1, world.comboFraction * 2))
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(overdrive ? "Overdrive" : "Combo \(world.combo), times \(world.comboMultiplier) gold")
+        .accessibilityLabel(overdrive ? String(localized: "Overdrive", bundle: .app) : String(localized: "Combo \(world.combo), times \(world.comboMultiplier) gold", bundle: .app))
     }
 
     private func bossBar(_ boss: Boss) -> some View {
@@ -316,7 +324,7 @@ struct GameView: View {
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Perks: " + Perk.allCases.filter { world.stacks($0) > 0 }.map(\.title).joined(separator: ", "))
+        .accessibilityLabel("Perks: \(Perk.allCases.filter { world.stacks($0) > 0 }.map(\.title).formatted(.list(type: .and)))")
     }
 
     /// The ore hold: slots used, and what it would sell for at the surface.
@@ -331,7 +339,7 @@ struct GameView: View {
                     .foregroundStyle(world.cargoFull ? Palette.hazard : Palette.textSecondary)
                     .monospacedDigit()
             }
-            Text("ore ≈\(world.cargoValue)")
+            Text("ore ≈\(world.cargoValue)", comment: "Approximate value of the ore in the hold")
                 .font(.system(size: 9, weight: .heavy, design: .rounded))
                 .foregroundStyle(Palette.textSecondary)
                 .monospacedDigit()
@@ -354,6 +362,8 @@ struct GameView: View {
                 .foregroundStyle(Palette.textPrimary)
             Text("HOLD TO DRILL")
                 .font(.system(size: 22, weight: .black, design: .rounded))
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
                 .foregroundStyle(Palette.textPrimary)
             Text("Drag in any direction to steer")
                 .font(.system(size: 14, weight: .semibold, design: .rounded))
@@ -386,6 +396,8 @@ private struct PerkOverlay: View {
             VStack(spacing: 12) {
                 Text("CHOOSE A PERK")
                     .font(.system(size: 24, weight: .black, design: .rounded))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
                     .foregroundStyle(Palette.textPrimary)
                 Text("Lasts until the end of this run")
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
@@ -429,7 +441,7 @@ private struct PerkOverlay: View {
                             .font(.system(size: 15, weight: .black, design: .rounded))
                             .foregroundStyle(Palette.textPrimary)
                         if perk.maxStacks > 1 {
-                            Text("LV \(level + 1)")
+                            Text("LV \(level + 1)", comment: "Short for level")
                                 .font(.system(size: 10, weight: .heavy, design: .rounded))
                                 .foregroundStyle(perk.tint)
                         }
@@ -469,9 +481,9 @@ private struct PauseOverlay: View {
                 if let world = app.world {
                     // How the run is going, so ending it is an informed choice.
                     HStack(spacing: 0) {
-                        summary("\(Int(world.maxDepth)) m", "DEPTH", Palette.textPrimary)
-                        summary("\(world.cargoValue)", "ORE", world.currentLayer.ore.color)
-                        summary("\(world.coins)", "COINS", Palette.gold)
+                        summary(String(localized: "\(Int(world.maxDepth)) m", bundle: .app, comment: "Depth in metres"), String(localized: "DEPTH", bundle: .app), Palette.textPrimary)
+                        summary("\(world.cargoValue)", String(localized: "ORE", bundle: .app), world.currentLayer.ore.color)
+                        summary("\(world.coins)", String(localized: "COINS", bundle: .app), Palette.gold)
                     }
                     .padding(.vertical, 10)
                     .card(16, fill: Palette.panelSunken)
@@ -485,13 +497,13 @@ private struct PauseOverlay: View {
                                     .background(Circle().fill(Palette.panelSunken))
                             }
                         }
-                        .accessibilityLabel("Perks: " + Perk.allCases.filter { world.stacks($0) > 0 }.map(\.title).joined(separator: ", "))
+                        .accessibilityLabel("Perks: \(Perk.allCases.filter { world.stacks($0) > 0 }.map(\.title).formatted(.list(type: .and)))")
                     }
                 }
-                PrimaryButton(title: "RESUME", icon: "play.fill") {
+                PrimaryButton(title: String(localized: "RESUME", bundle: .app), icon: "play.fill") {
                     app.isPaused = false
                 }
-                SecondaryButton(title: "END RUN", icon: "stop.fill") {
+                SecondaryButton(title: String(localized: "END RUN", bundle: .app), icon: "stop.fill") {
                     app.abandonRun()
                 }
             }
@@ -512,6 +524,8 @@ private struct PauseOverlay: View {
                 .font(.system(size: 9, weight: .heavy, design: .rounded))
                 .foregroundStyle(Palette.textSecondary)
                 .kerning(0.8)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
         }
         .frame(maxWidth: .infinity)
         .accessibilityElement(children: .combine)
@@ -533,23 +547,25 @@ private struct RefuelOverlay: View {
                     .foregroundStyle(Palette.hazard)
                 Text("OUT OF FUEL")
                     .font(.system(size: 26, weight: .black, design: .rounded))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
                     .foregroundStyle(Palette.textPrimary)
-                Text("at \(max(0, Int(world.maxDepth))) m")
+                Text("at \(max(0, Int(world.maxDepth))) m", comment: "Depth reached, in metres")
                     .font(.system(size: 15, weight: .bold, design: .rounded))
                     .foregroundStyle(Palette.textSecondary)
 
-                PrimaryButton(title: app.watchingAd ? "LOADING AD…" : "FREE REFILL",
+                PrimaryButton(title: app.watchingAd ? String(localized: "LOADING AD…", bundle: .app) : String(localized: "FREE REFILL", bundle: .app),
                               icon: app.watchingAd ? "hourglass" : (app.adsRemoved ? "fuelpump.fill" : "play.rectangle.fill")) {
                     app.watchAdForRefill()
                 }
                 .disabled(app.watchingAd)
                 .opacity(app.watchingAd ? 0.75 : 1)
                 .padding(.top, 12)
-                Text(app.adsRemoved ? "No ads needed · once per run" : "Watch a short ad · once per run")
+                Text(app.adsRemoved ? String(localized: "No ads needed · once per run", bundle: .app) : String(localized: "Watch a short ad · once per run", bundle: .app))
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
                     .foregroundStyle(Palette.textSecondary)
 
-                SecondaryButton(title: "BANK MY TREASURE") {
+                SecondaryButton(title: String(localized: "BANK MY TREASURE", bundle: .app)) {
                     world.confirmEnd()
                 }
                 .disabled(app.watchingAd)

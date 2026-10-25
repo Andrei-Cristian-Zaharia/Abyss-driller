@@ -17,19 +17,25 @@ enum BugReport {
     static let subject = "[Abyss Drill] Bug report"
 
     static func body(bestDepth: Int) -> String {
-        """
-        What happened?
+        // The questions are for the player, in their language; the details
+        // under the line stay English for the support inbox.
+        let what = String(localized: "What happened?", bundle: .app, comment: "Bug report email question")
+        let expected = String(localized: "What did you expect to happen?", bundle: .app, comment: "Bug report email question")
+        let whereAt = String(localized: "Where were you? (biome, boss, screen)", bundle: .app, comment: "Bug report email question")
+        let keep = String(localized: "Please keep the details below, they help fix the bug.", bundle: .app, comment: "Bug report email")
+        return """
+        \(what)
 
 
-        What did you expect to happen?
+        \(expected)
 
 
-        Where were you? (biome, boss, screen)
+        \(whereAt)
 
 
 
         ---
-        Please keep the details below, they help fix the bug.
+        \(keep)
         App: \(appVersion)
         Device: \(deviceModel)
         System: \(systemVersion)

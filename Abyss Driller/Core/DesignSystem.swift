@@ -124,11 +124,13 @@ struct ScreenHeader<Trailing: View>: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            CircleIconButton(icon: "chevron.left", label: "Back", action: onBack)
+            CircleIconButton(icon: "chevron.left", label: String(localized: "Back", bundle: .app), action: onBack)
             Text(title)
                 .font(.system(size: 20, weight: .black, design: .rounded))
                 .foregroundStyle(Palette.textPrimary)
                 .kerning(0.6)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
                 .accessibilityAddTraits(.isHeader)
             Spacer()
             trailing()
@@ -202,7 +204,7 @@ struct DrillToggleStyle: ToggleStyle {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityValue(configuration.isOn ? "On" : "Off")
+        .accessibilityValue(configuration.isOn ? Text("On") : Text("Off"))
         .accessibilityAddTraits(.isToggle)
     }
 }

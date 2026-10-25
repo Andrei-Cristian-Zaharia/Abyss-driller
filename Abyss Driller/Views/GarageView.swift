@@ -40,7 +40,7 @@ struct GarageView: View {
     }
 
     private var header: some View {
-        ScreenHeader(title: "GARAGE", onBack: { app.screen = .home }) {
+        ScreenHeader(title: String(localized: "GARAGE", bundle: .app), onBack: { app.screen = .home }) {
             GoldPill(amount: app.profile.gold, compact: true)
         }
     }
@@ -71,7 +71,7 @@ struct GarageView: View {
                                      center: .center, startRadius: 10, endRadius: 190))
         )
         .card(22, fill: .clear)
-        .accessibilityLabel("Your drill: " + app.profile.build.parts.map(\.title).joined(separator: ", "))
+        .accessibilityLabel("Your drill: \(app.profile.build.parts.map(\.title).formatted(.list(type: .and)))")
     }
 
     /// The resolved rig, so trade-offs are visible before a run.
@@ -79,11 +79,11 @@ struct GarageView: View {
         let rig = app.profile.runLoadout
         let build = app.profile.gear
         return HStack(spacing: 0) {
-            stat("bolt.fill", "\(rig.power)", "POWER", Palette.drillBody)
-            stat("fuelpump.fill", "\(Int(rig.fuelCapacity))", "FUEL", Palette.mint)
-            stat("shield.lefthalf.filled", "\(rig.armor)", "ARMOR", Palette.window)
-            stat("shippingbox.fill", "\(rig.cargoSlots)", "HOLD", Palette.gem)
-            stat("speedometer", "\(Int((build.speedFactor * 100).rounded()))%", "SPEED", Palette.textPrimary)
+            stat("bolt.fill", "\(rig.power)", String(localized: "POWER", bundle: .app), Palette.drillBody)
+            stat("fuelpump.fill", "\(Int(rig.fuelCapacity))", String(localized: "FUEL", bundle: .app), Palette.mint)
+            stat("shield.lefthalf.filled", "\(rig.armor)", String(localized: "ARMOR", bundle: .app), Palette.window)
+            stat("shippingbox.fill", "\(rig.cargoSlots)", String(localized: "HOLD", bundle: .app, comment: "Cargo hold capacity"), Palette.gem)
+            stat("speedometer", "\(Int((build.speedFactor * 100).rounded()))%", String(localized: "SPEED", bundle: .app), Palette.textPrimary)
         }
         .padding(.vertical, 10)
         .card(16)
@@ -102,6 +102,8 @@ struct GarageView: View {
                 .font(.system(size: 8.5, weight: .heavy, design: .rounded))
                 .foregroundStyle(Palette.textSecondary)
                 .kerning(0.6)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
         }
         .frame(maxWidth: .infinity)
         .accessibilityElement(children: .combine)
@@ -127,6 +129,8 @@ struct GarageView: View {
                             .font(.system(size: 10, weight: .black, design: .rounded))
                             .foregroundStyle(selected ? Palette.background : Palette.textSecondary)
                             .kerning(0.6)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 9)
@@ -141,7 +145,7 @@ struct GarageView: View {
                     }
                 }
                 .buttonStyle(SquishButtonStyle())
-                .accessibilityLabel("\(tab.title.capitalized): \(fitted.title)")
+                .accessibilityLabel("\(tab.title.localizedCapitalized): \(fitted.title)")
                 .accessibilityAddTraits(selected ? .isSelected : [])
             }
         }
@@ -181,13 +185,17 @@ private struct PartCard: View {
                         .background(Circle().fill(Palette.panelSunken))
                     VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: 6) {
-                            Text(part.title.uppercased())
+                            Text(part.title.localizedUppercase)
                                 .font(.system(size: 13, weight: .black, design: .rounded))
                                 .foregroundStyle(owned ? Palette.textPrimary : Palette.textSecondary)
+                                .lineLimit(2)
+                                .minimumScaleFactor(0.75)
                             RarityTag(rarity: part.rarity)
                             if part.isRisky {
-                                Text("RISKY")
+                                Text("RISKY", comment: "Tag on parts with a drawback")
                                     .font(.system(size: 8, weight: .black, design: .rounded))
+                                    .lineLimit(1)
+                                    .fixedSize()
                                     .foregroundStyle(Palette.background)
                                     .padding(.horizontal, 5)
                                     .padding(.vertical, 2)
@@ -228,7 +236,7 @@ private struct PartCard: View {
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(affordable ? Palette.mint : Palette.textSecondary)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("MK \(String(repeating: "I", count: level + 1))")
+                    Text("MK \(String(repeating: "I", count: level + 1))", comment: "Part mark in roman numerals")
                         .font(.system(size: 10, weight: .black, design: .rounded))
                         .foregroundStyle(Palette.textPrimary)
                     Text(part.detail(level: level + 1))
@@ -244,7 +252,7 @@ private struct PartCard: View {
                             Image(systemName: "seal.fill")
                                 .font(.system(size: 9, weight: .bold))
                                 .foregroundStyle(boss.tint)
-                            Text("\(app.profile.cores(boss))/\(cost.cores) cores")
+                            Text("\(app.profile.cores(boss))/\(cost.cores) cores", comment: "Boss cores owned / needed")
                                 .font(.system(size: 10, weight: .heavy, design: .rounded))
                                 .foregroundStyle(app.profile.cores(boss) >= cost.cores ? Palette.textPrimary : Palette.hazard)
                         }
@@ -256,7 +264,9 @@ private struct PartCard: View {
             .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Palette.panelSunken))
         }
         .buttonStyle(SquishButtonStyle())
-        .accessibilityLabel("Upgrade \(part.title) to Mark \(level + 1): \(part.detail(level: level + 1)). Costs \(cost.gold) gold" + (cost.cores > 0 ? " and \(cost.cores) boss cores." : "."))
+        .accessibilityLabel(cost.cores > 0
+            ? String(localized: "Upgrade \(part.title) to Mark \(level + 1): \(part.detail(level: level + 1)). Costs \(cost.gold) gold and \(cost.cores) boss cores.", bundle: .app)
+            : String(localized: "Upgrade \(part.title) to Mark \(level + 1): \(part.detail(level: level + 1)). Costs \(cost.gold) gold.", bundle: .app))
     }
 
     @ViewBuilder
@@ -264,6 +274,8 @@ private struct PartCard: View {
         if equipped {
             Text("EQUIPPED")
                 .font(.system(size: 10, weight: .black, design: .rounded))
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
                 .foregroundStyle(Palette.background)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 5)
@@ -282,12 +294,12 @@ private struct PartCard: View {
             // Locked boss part: cores collected towards the unlock.
             let have = min(app.profile.coresCollected(boss), ShipPart.coresToUnlock)
             VStack(alignment: .trailing, spacing: 4) {
-                Text("\(have)/\(ShipPart.coresToUnlock) CORES")
+                Text("\(have)/\(ShipPart.coresToUnlock) CORES", comment: "Boss cores collected / needed")
                     .font(.system(size: 10, weight: .black, design: .rounded))
                     .foregroundStyle(boss.tint)
                 CoreBar(value: have, tint: boss.tint)
                     .frame(width: 70)
-                Text("BEAT \(boss.title)")
+                Text("BEAT \(boss.title)", comment: "Defeat this boss to unlock the part")
                     .font(.system(size: 8, weight: .black, design: .rounded))
                     .foregroundStyle(Palette.textSecondary)
                     .lineLimit(1)
@@ -298,15 +310,17 @@ private struct PartCard: View {
     }
 
     private var accessibilityText: String {
-        var text = "\(part.title), \(part.rarity.title.lowercased()). \(part.detail(level: owned ? level : 1))."
-        if !part.isStarter, owned { text += " Mark \(level)." }
-        if equipped { text += " Equipped." }
-        else if owned { text += " Tap to equip." }
-        else if app.isForSale(part), let price = part.buyPrice { text += " Costs \(price) gold." }
+        // Whole sentences, each localized on its own, joined with a space.
+        var parts = [String(localized: "\(part.title), \(part.rarity.title.localizedLowercase). \(part.detail(level: owned ? level : 1)).", bundle: .app,
+                            comment: "Part name, rarity, stats")]
+        if !part.isStarter, owned { parts.append(String(localized: "Mark \(level).", bundle: .app)) }
+        if equipped { parts.append(String(localized: "Equipped.", bundle: .app)) }
+        else if owned { parts.append(String(localized: "Tap to equip.", bundle: .app)) }
+        else if app.isForSale(part), let price = part.buyPrice { parts.append(String(localized: "Costs \(price) gold.", bundle: .app)) }
         else if let boss = part.droppedBy {
-            text += " \(app.profile.coresCollected(boss)) of \(ShipPart.coresToUnlock) \(boss.title) cores collected. Beat it to collect more."
+            parts.append(String(localized: "\(app.profile.coresCollected(boss)) of \(ShipPart.coresToUnlock) \(boss.title) cores collected. Beat it to collect more.", bundle: .app))
         }
-        return text
+        return parts.joined(separator: " ")
     }
 }
 
@@ -336,6 +350,8 @@ struct RarityTag: View {
         Text(rarity.title)
             .font(.system(size: 7.5, weight: .black, design: .rounded))
             .kerning(0.4)
+            .lineLimit(1)
+            .fixedSize()
             .foregroundStyle(rarity == .common ? Palette.background : Palette.background)
             .padding(.horizontal, 5)
             .padding(.vertical, 2)

@@ -15,9 +15,16 @@ struct SettingsView: View {
         BugReport.openMailLink(bestDepth: app.profile.bestDepth) { opened in
             if !opened {
                 BugReport.copyAddress()
-                app.toast = "EMAIL COPIED: \(BugReport.address.uppercased())"
+                app.toast = String(localized: "EMAIL COPIED: \(BugReport.address.uppercased())", bundle: .app)
             }
         }
+    }
+
+    /// The language the game is showing, named in that language.
+    private var currentLanguage: String {
+        app.settings.language == nil
+            ? String(localized: "Device", bundle: .app, comment: "Language setting: follow the device's language")
+            : AppLanguage.nativeName(AppLanguage.current)
     }
 
     var body: some View {
@@ -27,30 +34,30 @@ struct SettingsView: View {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 14) {
                     header
-                    section("CONTROLS") {
-                        sliderRow(title: "Steering sensitivity",
+                    section(String(localized: "CONTROLS", bundle: .app), icon: "hand.draw.fill") {
+                        sliderRow(title: String(localized: "Steering sensitivity", bundle: .app),
                                   value: $app.settings.sensitivity,
                                   range: GameSettings.sensitivityRange,
-                                  label: String(format: "%.0f%%", app.settings.sensitivity * 100),
-                                  hint: "How fast the drill turns toward your thumb.")
+                                  label: (app.settings.sensitivity).formatted(.percent.precision(.fractionLength(0))),
+                                  hint: String(localized: "How fast the drill turns toward your thumb.", bundle: .app))
                         Divider().overlay(Palette.panelRaised)
-                        sliderRow(title: "Dead zone",
+                        sliderRow(title: String(localized: "Dead zone", bundle: .app, comment: "Joystick dead zone setting"),
                                   value: $app.settings.deadZone,
                                   range: GameSettings.deadZoneRange,
-                                  label: "\(Int(app.settings.deadZone)) pt",
-                                  hint: "How far your thumb must move before the drill turns. Raise it if small wobbles steer you.")
+                                  label: String(localized: "\(Int(app.settings.deadZone)) pt", bundle: .app, comment: "Dead zone size in points"),
+                                  hint: String(localized: "How far your thumb must move before the drill turns. Raise it if small wobbles steer you.", bundle: .app))
                         Divider().overlay(Palette.panelRaised)
-                        toggleRow("Show joystick", isOn: $app.settings.showJoystick)
+                        toggleRow(String(localized: "Show joystick", bundle: .app), isOn: $app.settings.showJoystick)
                     }
-                    section("FEEL") {
-                        toggleRow("Sound effects", isOn: $app.settings.sound)
-                        toggleRow("Music", isOn: $app.settings.music)
-                        toggleRow("Haptics", isOn: $app.settings.haptics)
+                    section(String(localized: "FEEL", bundle: .app, comment: "Settings section: sound, music, haptics"), icon: "sparkles") {
+                        toggleRow(String(localized: "Sound effects", bundle: .app), isOn: $app.settings.sound)
+                        toggleRow(String(localized: "Music", bundle: .app), isOn: $app.settings.music)
+                        toggleRow(String(localized: "Haptics", bundle: .app), isOn: $app.settings.haptics)
                         Divider().overlay(Palette.panelRaised)
-                        toggleRow("Screen shake", isOn: $app.settings.screenShake)
+                        toggleRow(String(localized: "Screen shake", bundle: .app), isOn: $app.settings.screenShake)
                     }
                     if app.ads.privacyOptionsRequired {
-                        section("PRIVACY") {
+                        section(String(localized: "PRIVACY", bundle: .app), icon: "hand.raised.fill") {
                             Button {
                                 app.ads.presentPrivacyOptions()
                             } label: {
@@ -69,7 +76,34 @@ struct SettingsView: View {
                             .accessibilityHint("Review how ads use your data")
                         }
                     }
-                    section("HELP") {
+                    section(String(localized: "HELP", bundle: .app), icon: "sparkles") {
+                        Menu {
+                            Picker(selection: $app.settings.language) {
+                                Text("Device language", comment: "Language setting: follow the device's language")
+                                    .tag(String?.none)
+                                ForEach(AppLanguage.supported, id: \.self) { code in
+                                    Text(verbatim: AppLanguage.nativeName(code)).tag(Optional(code))
+                                }
+                            } label: { EmptyView() }
+                        } label: {
+                            HStack {
+                                Text("Language")
+                                    .font(.system(size: 14, weight: .heavy, design: .rounded))
+                                    .foregroundStyle(Palette.textPrimary)
+                                Spacer()
+                                Text(currentLanguage)
+                                    .font(.system(size: 13, weight: .black, design: .rounded))
+                                    .foregroundStyle(Palette.mint)
+                                Image(systemName: "chevron.up.chevron.down")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundStyle(Palette.textSecondary)
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(Text("Language"))
+                        .accessibilityValue(Text(verbatim: currentLanguage))
+                        Divider().overlay(Palette.panelRaised)
                         Button {
                             app.screen = .howToPlay
                         } label: {
@@ -104,8 +138,11 @@ struct SettingsView: View {
                         .buttonStyle(.plain)
                         .accessibilityHint("Opens an email to the developer with your device details filled in")
                     }
-                    SecondaryButton(title: "RESET TO DEFAULTS", icon: "arrow.counterclockwise") {
-                        app.settings = GameSettings()
+                    SecondaryButton(title: String(localized: "RESET TO DEFAULTS", bundle: .app), icon: "arrow.counterclockwise") {
+                        // Controls and feel only: a reset shouldn't switch the language.
+                        var defaults = GameSettings()
+                        defaults.language = app.settings.language
+                        app.settings = defaults
                         Haptics.tap()
                     }
                     #if DEBUG
@@ -132,7 +169,7 @@ struct SettingsView: View {
         .sheet(isPresented: $showingMail) {
             MailSheet(bestDepth: app.profile.bestDepth) { sent in
                 showingMail = false
-                if sent { app.toast = "THANKS! REPORT SENT" }
+                if sent { app.toast = String(localized: "THANKS! REPORT SENT", bundle: .app) }
             }
             .ignoresSafeArea()
         }
@@ -148,7 +185,7 @@ struct SettingsView: View {
     /// For playtesting: start over from a fresh install without deleting the app.
     private var testingSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            SectionHeader(title: "TESTING", icon: "wrench.adjustable.fill")
+            SectionHeader(title: String(localized: "TESTING", bundle: .app), icon: "wrench.adjustable.fill")
             Button {
                 confirmingReset = true
                 Haptics.bump()
@@ -176,12 +213,13 @@ struct SettingsView: View {
     }
 
     private var header: some View {
-        ScreenHeader(title: "SETTINGS", onBack: { app.screen = .home })
+        ScreenHeader(title: String(localized: "SETTINGS", bundle: .app), onBack: { app.screen = .home })
     }
 
-    private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+    private func section<Content: View>(_ title: String, icon: String,
+                                        @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            SectionHeader(title: title, icon: title == "CONTROLS" ? "hand.draw.fill" : (title == "PRIVACY" ? "hand.raised.fill" : "sparkles"))
+            SectionHeader(title: title, icon: icon)
             VStack(spacing: 12) { content() }
                 .padding(14)
                 .card(18)

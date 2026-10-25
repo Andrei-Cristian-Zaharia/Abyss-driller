@@ -310,15 +310,16 @@ struct GameRenderer {
         line.addLine(to: CGPoint(x: Double(size.width) - 18, y: y))
         ctx.stroke(line, with: .color(Palette.textSecondary.opacity(0.35)),
                    style: StrokeStyle(lineWidth: 1.5, dash: [5, 7]))
-        let plateWidth = Double(name.count) * 7.6 + 26
+        // Measured, not counted: CJK glyphs are much wider than Latin ones.
+        let label = ctx.resolve(Text(name)
+            .font(.system(size: 10, weight: .heavy, design: .rounded))
+            .foregroundStyle(Palette.textSecondary))
+        let plateWidth = label.measure(in: CGSize(width: 1000, height: 40)).width + 18
         ctx.fill(Path(roundedRect: CGRect(x: Double(size.width) / 2 - plateWidth / 2,
                                           y: y - 24, width: plateWidth, height: 17),
                       cornerRadius: 8.5),
                  with: .color(Palette.background.opacity(0.6)))
-        ctx.draw(Text(name)
-            .font(.system(size: 10, weight: .heavy, design: .rounded))
-            .foregroundStyle(Palette.textSecondary),
-                 at: CGPoint(x: Double(size.width) / 2, y: y - 15.5))
+        ctx.draw(label, at: CGPoint(x: Double(size.width) / 2, y: y - 15.5))
     }
 
     private func drawDecor(_ ctx: GraphicsContext) {
@@ -523,11 +524,12 @@ struct GameRenderer {
         ctx.stroke(line, with: .color(Palette.gold.opacity(0.85)),
                    style: StrokeStyle(lineWidth: 2.5, dash: [9, 7]))
 
-        let label = Text("BEST: \(Int(best)) m")
+        let label = ctx.resolve(Text("BEST: \(Int(best)) m")
             .font(.system(size: 11, weight: .heavy, design: .rounded))
-            .foregroundStyle(Palette.background)
-        let pill = Path(roundedRect: CGRect(x: Double(size.width) / 2 - 46, y: y - 21,
-                                            width: 92, height: 18),
+            .foregroundStyle(Palette.background))
+        let pillWidth = max(92, label.measure(in: CGSize(width: 1000, height: 40)).width + 20)
+        let pill = Path(roundedRect: CGRect(x: Double(size.width) / 2 - pillWidth / 2, y: y - 21,
+                                            width: pillWidth, height: 18),
                         cornerRadius: 9)
         ctx.fill(pill, with: .color(Palette.gold.opacity(0.9)))
         ctx.draw(label, at: CGPoint(x: Double(size.width) / 2, y: y - 12))
@@ -780,7 +782,7 @@ struct GameRenderer {
             }
 
             if pickup.deniedFlash > 0.4 {
-                ctx.draw(Text("FULL")
+                ctx.draw(Text("FULL", comment: "Over an ore the full hold could not take")
                     .font(.system(size: 10, weight: .heavy, design: .rounded))
                     .foregroundStyle(Palette.hazard),
                          at: CGPoint(x: center.x, y: center.y - 20))
@@ -2711,7 +2713,7 @@ struct GameRenderer {
             let stack = Double(count - 1 - index) * 38
             let y = Double(size.height) * 0.46 - rise - stack
             // Long banners shrink to fit the column instead of running off it.
-            let fit = min(28, Double(size.width) * 1.55 / Double(max(8, shout.text.count)))
+            let fit = min(28, Double(size.width) * 1.55 / max(8, Self.letterWidth(shout.text)))
             comicText(ctx, shout.text, size: fit, tint: shout.tint, opacity: opacity,
                       at: CGPoint(x: Double(size.width) / 2, y: y))
         }
@@ -2760,19 +2762,34 @@ struct GameRenderer {
         edges.move(to: CGPoint(x: -bannerW / 2, y: bannerH / 2)); edges.addLine(to: CGPoint(x: bannerW / 2, y: bannerH / 2))
         banner.stroke(edges, with: .color(Palette.ink), lineWidth: 4)
         // "BOSS" tag, name, and which biome it guards.
-        let tag = Path(roundedRect: CGRect(x: -34, y: -bannerH / 2 + 10, width: 68, height: 20), cornerRadius: 10)
+        let tagText = banner.resolve(Text(boss.mini ? String(localized: "MINI BOSS", bundle: .app, comment: "Boss intro tag")
+                                                    : String(localized: "BOSS", bundle: .app, comment: "Boss intro tag"))
+            .font(.system(size: 11, weight: .black, design: .rounded))
+            .foregroundStyle(Palette.shine))
+        let tagW = max(68, tagText.measure(in: CGSize(width: 400, height: 40)).width + 20)
+        let tag = Path(roundedRect: CGRect(x: -tagW / 2, y: -bannerH / 2 + 10, width: tagW, height: 20), cornerRadius: 10)
         banner.fill(tag, with: .color(Palette.hazard))
         banner.stroke(tag, with: .color(Palette.ink), lineWidth: 2)
-        banner.draw(Text(boss.mini ? "MINI BOSS" : "BOSS").font(.system(size: 11, weight: .black, design: .rounded))
-                        .foregroundStyle(Palette.shine), at: CGPoint(x: 0, y: -bannerH / 2 + 20))
-        let fit = min(34, w * 1.5 / Double(max(8, boss.title.count)))
+        banner.draw(tagText, at: CGPoint(x: 0, y: -bannerH / 2 + 20))
+        let fit = min(34, w * 1.5 / max(8, Self.letterWidth(boss.title)))
         comicText(banner, boss.title, size: fit, tint: boss.kind.tint, opacity: 1, at: CGPoint(x: 0, y: 4))
-        // "THE ABYSS" / "THE VOID" already carry "the": don't say it twice.
-        var guarded = Strata.layer(for: max(0, boss.arenaTop)).name.capitalized
-        if guarded.hasPrefix("The ") { guarded.removeFirst(4) }
-        banner.draw(Text(boss.mini ? "Back for more" : "Guardian of the \(guarded)")
+        let guarded = Strata.layer(for: max(0, boss.arenaTop)).guardian
+        banner.draw(Text(boss.mini ? String(localized: "Back for more", bundle: .app, comment: "Boss intro banner for a mini boss rematch") : guarded)
                         .font(.system(size: 13, weight: .heavy, design: .rounded))
                         .foregroundStyle(Palette.ink.opacity(0.7)), at: CGPoint(x: 0, y: bannerH / 2 - 22))
+    }
+
+    /// Length of a line in Latin-letter widths, for fitting banners: CJK and
+    /// other full-width glyphs are about 1.6 times as wide as a capital.
+    static func letterWidth(_ text: String) -> Double {
+        text.unicodeScalars.reduce(0) { sum, scalar in
+            switch scalar.value {
+            case 0x1100...0x115F, 0x2E80...0xA4CF, 0xAC00...0xD7A3, 0xF900...0xFAFF, 0xFF00...0xFF60:
+                return sum + 1.6
+            default:
+                return sum + 1
+            }
+        }
     }
 
     /// Comic lettering: the word drawn in ink around itself, then in colour.

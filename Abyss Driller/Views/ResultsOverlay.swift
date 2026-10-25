@@ -46,19 +46,21 @@ struct ResultsOverlay: View {
                     .overlay(Circle().strokeBorder(.white.opacity(0.25), lineWidth: 2))
                     .shadow(color: badgeTint.opacity(0.5), radius: 12)
                     .scaleEffect(appeared || reduceMotion ? 1 : 0.4)
-                Text(result.newRecord ? "NEW RECORD!" : headline)
+                Text(result.newRecord ? String(localized: "NEW RECORD!", bundle: .app) : headline)
                     .font(.system(size: 20, weight: .black, design: .rounded))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
                     .foregroundStyle(result.newRecord ? Palette.gold : Palette.textPrimary)
             }
             .accessibilityElement(children: .combine)
 
             HStack(spacing: 0) {
-                StatBlock(caption: "DEPTH", value: "\(result.depth) m",
+                StatBlock(caption: String(localized: "DEPTH", bundle: .app), value: String(localized: "\(result.depth) m", bundle: .app, comment: "Depth in metres"),
                           tint: result.newRecord ? Palette.gold : Palette.textPrimary)
                     .frame(maxWidth: .infinity)
                 Rectangle().fill(Palette.panelRaised).frame(width: 1, height: 40)
                 VStack(spacing: 2) {
-                    Text(result.isDaily ? "SCORE" : "GOLD")
+                    Text(result.isDaily ? String(localized: "SCORE", bundle: .app) : String(localized: "GOLD", bundle: .app))
                         .font(.system(size: 11, weight: .heavy, design: .rounded))
                         .foregroundStyle(Palette.textSecondary)
                     Text("\(shownGold)")
@@ -69,7 +71,7 @@ struct ResultsOverlay: View {
                 }
                 .frame(maxWidth: .infinity)
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel("\(result.isDaily ? "Score" : "Gold") \(result.isDaily ? result.dailyScore : result.payout)")
+                .accessibilityLabel(result.isDaily ? String(localized: "Score \(result.dailyScore)", bundle: .app) : String(localized: "Gold \(result.payout)", bundle: .app))
             }
 
             if !result.newRecord, !result.isDaily, result.previousBest > 0 {
@@ -87,11 +89,11 @@ struct ResultsOverlay: View {
                         .frame(width: 32, height: 32)
                         .background(Circle().fill(Palette.panelSunken))
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("\(item.boss.title) CORES \(item.cores)/\(ShipPart.coresToUnlock)")
+                        Text("\(item.boss.title) CORES \(item.cores)/\(ShipPart.coresToUnlock)", comment: "Boss name, cores collected / cores needed")
                             .font(.system(size: 11, weight: .black, design: .rounded))
                             .foregroundStyle(Palette.textPrimary)
                         CoreBar(value: item.cores, tint: item.boss.tint)
-                        Text("\(ShipPart.coresToUnlock - item.cores) more to unlock \(part.title)")
+                        Text("\(ShipPart.coresToUnlock - item.cores) more to unlock \(part.title)", comment: "Number of boss cores still needed, then the part name")
                             .font(.system(size: 10, weight: .semibold, design: .rounded))
                             .foregroundStyle(Palette.textSecondary)
                     }
@@ -111,12 +113,12 @@ struct ResultsOverlay: View {
                         .background(Circle().fill(Palette.panelSunken))
                     VStack(alignment: .leading, spacing: 1) {
                         HStack(spacing: 6) {
-                            Text("NOW FOR SALE · \(part.title.uppercased())")
+                            Text("NOW FOR SALE · \(part.title.localizedUppercase)")
                                 .font(.system(size: 12, weight: .black, design: .rounded))
                                 .foregroundStyle(part.rarity.color)
                             RarityTag(rarity: part.rarity)
                         }
-                        Text(part.detail(level: 1) + " · buy it in the Garage for \((part.buyPrice ?? 0).formatted()) gold")
+                        Text("\(part.detail(level: 1)) · buy it in the Garage for \((part.buyPrice ?? 0).formatted()) gold", comment: "Part stats, then its price")
                             .font(.system(size: 11, weight: .semibold, design: .rounded))
                             .foregroundStyle(Palette.textSecondary)
                     }
@@ -130,10 +132,10 @@ struct ResultsOverlay: View {
             // Where the gold came from: the hold sold at the surface, plus coins.
             VStack(spacing: 5) {
                 earningsRow(icon: "shippingbox.fill", tint: Palette.gem,
-                            label: "Ore sold · \(result.oreCount) piece\(result.oreCount == 1 ? "" : "s")",
+                            label: String(localized: "Ore sold · \(result.oreCount) pieces", bundle: .app),
                             value: result.oreValue)
                 earningsRow(icon: "dollarsign.circle.fill", tint: Palette.gold,
-                            label: "Bounties & treasure", value: result.coins)
+                            label: String(localized: "Bounties & treasure", bundle: .app), value: result.coins)
             }
             .padding(10)
             .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Palette.panelSunken))
@@ -141,47 +143,47 @@ struct ResultsOverlay: View {
             VStack(spacing: 7) {
                 if result.gems > 0 {
                     detailRow(icon: "diamond.fill", tint: Palette.gem,
-                              text: "\(result.gems) rare gem\(result.gems == 1 ? "" : "s")")
+                              text: String(localized: "\(result.gems) rare gems", bundle: .app))
                 }
                 if result.bestCombo >= 10 {
                     detailRow(icon: "flame.fill", tint: Palette.drillBody,
-                              text: "Best combo \(result.bestCombo)")
+                              text: String(localized: "Best combo \(result.bestCombo)", bundle: .app))
                 }
                 if !result.newEntries.isEmpty {
                     detailRow(icon: "book.closed.fill", tint: Palette.paper,
-                              text: "\(result.newEntries.count) new Field Guide entr\(result.newEntries.count == 1 ? "y" : "ies")")
+                              text: String(localized: "\(result.newEntries.count) new Field Guide entries", bundle: .app))
                 }
                 if result.bossesDefeated > 0 {
                     detailRow(icon: "crown.fill", tint: Palette.gold,
-                              text: "\(result.bossesDefeated) boss\(result.bossesDefeated == 1 ? "" : "es") defeated")
+                              text: String(localized: "\(result.bossesDefeated) bosses defeated", bundle: .app))
                 }
                 if result.enemiesDefeated > 0 {
                     detailRow(icon: "ant.fill", tint: Palette.worm,
-                              text: "\(result.enemiesDefeated) critter\(result.enemiesDefeated == 1 ? "" : "s") squashed")
+                              text: String(localized: "\(result.enemiesDefeated) critters squashed", bundle: .app))
                 }
                 if result.chambers > 0 {
                     detailRow(icon: "shippingbox.fill", tint: Palette.gold,
-                              text: "\(result.chambers) treasure chamber\(result.chambers == 1 ? "" : "s")")
+                              text: String(localized: "\(result.chambers) treasure chambers", bundle: .app))
                 }
                 if app.profile.doubleGold, !result.isDaily {
                     detailRow(icon: "multiply.circle.fill", tint: Palette.mint,
-                              text: "Double gold applied")
+                              text: String(localized: "Double gold applied", bundle: .app))
                 }
                 if result.cargoOverflowed {
                     detailRow(icon: "exclamationmark.triangle.fill", tint: Palette.hazard,
-                              text: "Hold filled up — a bigger hold sells for more")
+                              text: String(localized: "Hold filled up — a bigger hold sells for more", bundle: .app))
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
             VStack(spacing: 9) {
-                PrimaryButton(title: "DRILL AGAIN", icon: "arrow.clockwise") {
+                PrimaryButton(title: String(localized: "DRILL AGAIN", bundle: .app), icon: "arrow.clockwise") {
                     app.drillAgain()
                 }
                 HStack(spacing: 9) {
-                    SecondaryButton(title: result.cargoOverflowed ? "UPGRADE CARGO" : "UPGRADE",
+                    SecondaryButton(title: result.cargoOverflowed ? String(localized: "UPGRADE CARGO", bundle: .app) : String(localized: "UPGRADE", bundle: .app),
                                     icon: "wrench.and.screwdriver.fill") {
-                        app.goHome()
+                        app.leaveResultsHome()
                     }
                 }
             }
@@ -212,10 +214,10 @@ struct ResultsOverlay: View {
     }
 
     private var headline: String {
-        if result.isDaily { return "DAILY CHALLENGE COMPLETE" }
+        if result.isDaily { return String(localized: "DAILY CHALLENGE COMPLETE", bundle: .app) }
         switch result.reason {
-        case .outOfFuel: return "OUT OF FUEL"
-        case .wrecked: return "DRILL WRECKED"
+        case .outOfFuel: return String(localized: "OUT OF FUEL", bundle: .app)
+        case .wrecked: return String(localized: "DRILL WRECKED", bundle: .app)
         }
     }
 

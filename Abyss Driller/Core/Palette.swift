@@ -151,6 +151,8 @@ struct Ore {
 /// One band of earth. The run walks down through these in order.
 struct StrataLayer {
     let name: String
+    /// Boss banner line: "Guardian of the …", whole so each language words it.
+    let guardian: String
     let startDepth: Double
     let soil: Color
     let soilDeep: Color
@@ -167,98 +169,122 @@ struct StrataLayer {
 }
 
 enum Strata {
-    static let layers: [StrataLayer] = [
-        StrataLayer(name: "SURFACE",
-                    startDepth: 0,
-                    soil: Color(hex: 0x805238),
-                    soilDeep: Color(hex: 0x6B4229),
-                    pebble: Color(hex: 0x94634A),
-                    crystal: nil,
-                    goldValue: 6, gemValue: 28,
-                    vein: Color(hex: 0x9C7A4A), bedding: Color(hex: 0x9A6A4C),
-                    ore: Ore(name: "COPPER", color: Color(hex: 0xE58C55), shadow: Color(hex: 0xA85A2E))),
-        StrataLayer(name: "SHALLOW CAVES",
-                    startDepth: 90,
-                    soil: Color(hex: 0x674137),
-                    soilDeep: Color(hex: 0x54342C),
-                    pebble: Color(hex: 0x7C5046),
-                    crystal: nil,
-                    goldValue: 8, gemValue: 38,
-                    vein: Color(hex: 0x8A6A52), bedding: Color(hex: 0x81564A),
-                    ore: Ore(name: "SILVER", color: Color(hex: 0xDCE3EC), shadow: Color(hex: 0x98A4B6))),
-        StrataLayer(name: "DEEP CAVES",
-                    startDepth: 200,
-                    soil: Color(hex: 0x403451),
-                    soilDeep: Color(hex: 0x332941),
-                    pebble: Color(hex: 0x4F4164),
-                    crystal: nil,
-                    goldValue: 11, gemValue: 50,
-                    vein: Color(hex: 0x6E5A86), bedding: Color(hex: 0x554770),
-                    ore: Ore(name: "GOLD", color: Palette.gold, shadow: Palette.goldShadow)),
-        StrataLayer(name: "CRYSTAL CAVES",
-                    startDepth: 330,
-                    soil: Color(hex: 0x233B58),
-                    soilDeep: Color(hex: 0x1A2D45),
-                    pebble: Color(hex: 0x2D4A6D),
-                    crystal: Color(hex: 0x45D6CF),
-                    goldValue: 14, gemValue: 65,
-                    vein: Color(hex: 0x2F6F86), bedding: Color(hex: 0x325C85),
-                    ore: Ore(name: "PLATINUM", color: Color(hex: 0xCFF3F0), shadow: Color(hex: 0x7FBFC0))),
-        StrataLayer(name: "MAGMA CORE",
-                    startDepth: 480,
-                    soil: Color(hex: 0x4A2321),
-                    soilDeep: Color(hex: 0x381818),
-                    pebble: Color(hex: 0x5E2E28),
-                    crystal: nil,
-                    goldValue: 18, gemValue: 85,
-                    vein: Color(hex: 0xB4532A), bedding: Color(hex: 0x6E3326),
-                    ore: Ore(name: "MYTHRIL", color: Color(hex: 0x9FC2FF), shadow: Color(hex: 0x5B7FD6))),
-        StrataLayer(name: "THE ABYSS",
-                    startDepth: 630,
-                    soil: Color(hex: 0x10282B),
-                    soilDeep: Color(hex: 0x0A1B1E),
-                    pebble: Color(hex: 0x1C3C40),
-                    crystal: Color(hex: 0x7CF5C8),      // glowing fungus clusters
-                    goldValue: 22, gemValue: 100,
-                    vein: Color(hex: 0x2C7A73), bedding: Color(hex: 0x1E4A4D),
-                    ore: Ore(name: "PEARL", color: Color(hex: 0xFFD6EF), shadow: Color(hex: 0xC98AB4))),
-        StrataLayer(name: "ANCIENT RUINS",
-                    startDepth: 780,
-                    soil: Color(hex: 0x5A4830),
-                    soilDeep: Color(hex: 0x463722),
-                    pebble: Color(hex: 0x6E5A3A),
-                    crystal: Color(hex: 0xF2C14E),      // gold glyph shards
-                    goldValue: 27, gemValue: 120,
-                    vein: Color(hex: 0xC9A24A), bedding: Color(hex: 0x7A6440),
-                    ore: Ore(name: "JADE", color: Color(hex: 0x7FE0A8), shadow: Color(hex: 0x3E9E6E))),
-        StrataLayer(name: "FROZEN DEPTHS",
-                    startDepth: 930,
-                    soil: Color(hex: 0x46607A),
-                    soilDeep: Color(hex: 0x384E64),
-                    pebble: Color(hex: 0x6B87A1),
-                    crystal: Color(hex: 0xCFEFFF),      // icicle clusters
-                    goldValue: 32, gemValue: 140,
-                    vein: Color(hex: 0xA9DDF5), bedding: Color(hex: 0x5C7D99),
-                    ore: Ore(name: "SAPPHIRE", color: Color(hex: 0x5FA8FF), shadow: Color(hex: 0x2F64C2))),
-        StrataLayer(name: "SPORE HOLLOW",
-                    startDepth: 1080,
-                    soil: Color(hex: 0x2F4A2E),
-                    soilDeep: Color(hex: 0x243A24),
-                    pebble: Color(hex: 0x40613D),
-                    crystal: Color(hex: 0xB6F25A),      // glowing spore shards
-                    goldValue: 38, gemValue: 165,
-                    vein: Color(hex: 0x8FCB4A), bedding: Color(hex: 0x3C5E39),
-                    ore: Ore(name: "RADIUM", color: Color(hex: 0xD4FF6A), shadow: Color(hex: 0x86B52E))),
-        StrataLayer(name: "THE VOID",
-                    startDepth: 1230,
-                    soil: Color(hex: 0x1C1730),
-                    soilDeep: Color(hex: 0x141024),
-                    pebble: Color(hex: 0x2B2447),
-                    crystal: Color(hex: 0xC9B3FF),      // star shards
-                    goldValue: 45, gemValue: 195,
-                    vein: Color(hex: 0x7A5FC8), bedding: Color(hex: 0x30285A),
-                    ore: Ore(name: "STARDUST", color: Color(hex: 0xE9D6FF), shadow: Color(hex: 0x9D7BE0)))
-    ]
+    /// Indexes of layers with their own decor. Generation keys off these,
+    /// never off the (localized) names.
+    static let ruins = 6
+    static let frozen = 7
+    static let spore = 8
+    static let void = 9
+
+    /// Rebuilt by `reloadNames` when the in-app language changes.
+    static private(set) var layers: [StrataLayer] = makeLayers()
+
+    static func reloadNames() { layers = makeLayers() }
+
+    private static func makeLayers() -> [StrataLayer] {
+        [
+            StrataLayer(name: String(localized: "SURFACE", bundle: .app, comment: "Biome name"),
+                        guardian: String(localized: "Guardian of the Surface", bundle: .app, comment: "Boss intro banner: the biome this boss guards"),
+                        startDepth: 0,
+                        soil: Color(hex: 0x805238),
+                        soilDeep: Color(hex: 0x6B4229),
+                        pebble: Color(hex: 0x94634A),
+                        crystal: nil,
+                        goldValue: 6, gemValue: 28,
+                        vein: Color(hex: 0x9C7A4A), bedding: Color(hex: 0x9A6A4C),
+                        ore: Ore(name: String(localized: "COPPER", bundle: .app, comment: "Ore metal name"), color: Color(hex: 0xE58C55), shadow: Color(hex: 0xA85A2E))),
+            StrataLayer(name: String(localized: "SHALLOW CAVES", bundle: .app, comment: "Biome name"),
+                        guardian: String(localized: "Guardian of the Shallow Caves", bundle: .app, comment: "Boss intro banner: the biome this boss guards"),
+                        startDepth: 90,
+                        soil: Color(hex: 0x674137),
+                        soilDeep: Color(hex: 0x54342C),
+                        pebble: Color(hex: 0x7C5046),
+                        crystal: nil,
+                        goldValue: 8, gemValue: 38,
+                        vein: Color(hex: 0x8A6A52), bedding: Color(hex: 0x81564A),
+                        ore: Ore(name: String(localized: "SILVER", bundle: .app, comment: "Ore metal name"), color: Color(hex: 0xDCE3EC), shadow: Color(hex: 0x98A4B6))),
+            StrataLayer(name: String(localized: "DEEP CAVES", bundle: .app, comment: "Biome name"),
+                        guardian: String(localized: "Guardian of the Deep Caves", bundle: .app, comment: "Boss intro banner: the biome this boss guards"),
+                        startDepth: 200,
+                        soil: Color(hex: 0x403451),
+                        soilDeep: Color(hex: 0x332941),
+                        pebble: Color(hex: 0x4F4164),
+                        crystal: nil,
+                        goldValue: 11, gemValue: 50,
+                        vein: Color(hex: 0x6E5A86), bedding: Color(hex: 0x554770),
+                        ore: Ore(name: String(localized: "GOLD", bundle: .app, comment: "Ore metal name"), color: Palette.gold, shadow: Palette.goldShadow)),
+            StrataLayer(name: String(localized: "CRYSTAL CAVES", bundle: .app, comment: "Biome name"),
+                        guardian: String(localized: "Guardian of the Crystal Caves", bundle: .app, comment: "Boss intro banner: the biome this boss guards"),
+                        startDepth: 330,
+                        soil: Color(hex: 0x233B58),
+                        soilDeep: Color(hex: 0x1A2D45),
+                        pebble: Color(hex: 0x2D4A6D),
+                        crystal: Color(hex: 0x45D6CF),
+                        goldValue: 14, gemValue: 65,
+                        vein: Color(hex: 0x2F6F86), bedding: Color(hex: 0x325C85),
+                        ore: Ore(name: String(localized: "PLATINUM", bundle: .app, comment: "Ore metal name"), color: Color(hex: 0xCFF3F0), shadow: Color(hex: 0x7FBFC0))),
+            StrataLayer(name: String(localized: "MAGMA CORE", bundle: .app, comment: "Biome name"),
+                        guardian: String(localized: "Guardian of the Magma Core", bundle: .app, comment: "Boss intro banner: the biome this boss guards"),
+                        startDepth: 480,
+                        soil: Color(hex: 0x4A2321),
+                        soilDeep: Color(hex: 0x381818),
+                        pebble: Color(hex: 0x5E2E28),
+                        crystal: nil,
+                        goldValue: 18, gemValue: 85,
+                        vein: Color(hex: 0xB4532A), bedding: Color(hex: 0x6E3326),
+                        ore: Ore(name: String(localized: "MYTHRIL", bundle: .app, comment: "Ore metal name"), color: Color(hex: 0x9FC2FF), shadow: Color(hex: 0x5B7FD6))),
+            StrataLayer(name: String(localized: "THE ABYSS", bundle: .app, comment: "Biome name"),
+                        guardian: String(localized: "Guardian of the Abyss", bundle: .app, comment: "Boss intro banner: the biome this boss guards"),
+                        startDepth: 630,
+                        soil: Color(hex: 0x10282B),
+                        soilDeep: Color(hex: 0x0A1B1E),
+                        pebble: Color(hex: 0x1C3C40),
+                        crystal: Color(hex: 0x7CF5C8),      // glowing fungus clusters
+                        goldValue: 22, gemValue: 100,
+                        vein: Color(hex: 0x2C7A73), bedding: Color(hex: 0x1E4A4D),
+                        ore: Ore(name: String(localized: "PEARL", bundle: .app, comment: "Ore metal name"), color: Color(hex: 0xFFD6EF), shadow: Color(hex: 0xC98AB4))),
+            StrataLayer(name: String(localized: "ANCIENT RUINS", bundle: .app, comment: "Biome name"),
+                        guardian: String(localized: "Guardian of the Ancient Ruins", bundle: .app, comment: "Boss intro banner: the biome this boss guards"),
+                        startDepth: 780,
+                        soil: Color(hex: 0x5A4830),
+                        soilDeep: Color(hex: 0x463722),
+                        pebble: Color(hex: 0x6E5A3A),
+                        crystal: Color(hex: 0xF2C14E),      // gold glyph shards
+                        goldValue: 27, gemValue: 120,
+                        vein: Color(hex: 0xC9A24A), bedding: Color(hex: 0x7A6440),
+                        ore: Ore(name: String(localized: "JADE", bundle: .app, comment: "Ore metal name"), color: Color(hex: 0x7FE0A8), shadow: Color(hex: 0x3E9E6E))),
+            StrataLayer(name: String(localized: "FROZEN DEPTHS", bundle: .app, comment: "Biome name"),
+                        guardian: String(localized: "Guardian of the Frozen Depths", bundle: .app, comment: "Boss intro banner: the biome this boss guards"),
+                        startDepth: 930,
+                        soil: Color(hex: 0x46607A),
+                        soilDeep: Color(hex: 0x384E64),
+                        pebble: Color(hex: 0x6B87A1),
+                        crystal: Color(hex: 0xCFEFFF),      // icicle clusters
+                        goldValue: 32, gemValue: 140,
+                        vein: Color(hex: 0xA9DDF5), bedding: Color(hex: 0x5C7D99),
+                        ore: Ore(name: String(localized: "SAPPHIRE", bundle: .app, comment: "Ore metal name"), color: Color(hex: 0x5FA8FF), shadow: Color(hex: 0x2F64C2))),
+            StrataLayer(name: String(localized: "SPORE HOLLOW", bundle: .app, comment: "Biome name"),
+                        guardian: String(localized: "Guardian of the Spore Hollow", bundle: .app, comment: "Boss intro banner: the biome this boss guards"),
+                        startDepth: 1080,
+                        soil: Color(hex: 0x2F4A2E),
+                        soilDeep: Color(hex: 0x243A24),
+                        pebble: Color(hex: 0x40613D),
+                        crystal: Color(hex: 0xB6F25A),      // glowing spore shards
+                        goldValue: 38, gemValue: 165,
+                        vein: Color(hex: 0x8FCB4A), bedding: Color(hex: 0x3C5E39),
+                        ore: Ore(name: String(localized: "RADIUM", bundle: .app, comment: "Ore metal name"), color: Color(hex: 0xD4FF6A), shadow: Color(hex: 0x86B52E))),
+            StrataLayer(name: String(localized: "THE VOID", bundle: .app, comment: "Biome name"),
+                        guardian: String(localized: "Guardian of the Void", bundle: .app, comment: "Boss intro banner: the biome this boss guards"),
+                        startDepth: 1230,
+                        soil: Color(hex: 0x1C1730),
+                        soilDeep: Color(hex: 0x141024),
+                        pebble: Color(hex: 0x2B2447),
+                        crystal: Color(hex: 0xC9B3FF),      // star shards
+                        goldValue: 45, gemValue: 195,
+                        vein: Color(hex: 0x7A5FC8), bedding: Color(hex: 0x30285A),
+                        ore: Ore(name: String(localized: "STARDUST", bundle: .app, comment: "Ore metal name"), color: Color(hex: 0xE9D6FF), shadow: Color(hex: 0x9D7BE0)))
+        ]
+    }
 
     static func index(for depth: Double) -> Int {
         var result = 0

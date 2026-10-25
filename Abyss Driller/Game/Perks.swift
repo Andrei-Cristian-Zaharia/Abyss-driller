@@ -12,49 +12,49 @@ enum Perk: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .magnet: return "MAGNET"
-        case .wideBit: return "WIDE BIT"
-        case .diamondBit: return "DIAMOND BIT"
-        case .spikedHull: return "SPIKED HULL"
-        case .comboKeeper: return "COMBO KEEPER"
-        case .overcharge: return "OVERCHARGE"
-        case .prospector: return "PROSPECTOR"
-        case .efficientEngine: return "EFFICIENT ENGINE"
-        case .secondWind: return "SECOND WIND"
-        case .powerSurge: return "POWER SURGE"
-        case .plating: return "EXTRA PLATING"
-        case .bigHold: return "BIG HOLD"
-        case .reserveTank: return "RESERVE TANK"
-        case .bountyHunter: return "BOUNTY HUNTER"
-        case .daredevil: return "DAREDEVIL"
-        case .rockBreaker: return "ROCK BREAKER"
-        case .bossBreaker: return "BOSS BREAKER"
-        case .autoRepair: return "AUTO-REPAIR"
-        case .thermalCore: return "THERMAL CORE"
+        case .magnet: return String(localized: "MAGNET", bundle: .app, comment: "Perk name")
+        case .wideBit: return String(localized: "WIDE BIT", bundle: .app, comment: "Perk name")
+        case .diamondBit: return String(localized: "DIAMOND BIT", bundle: .app, comment: "Perk name")
+        case .spikedHull: return String(localized: "SPIKED HULL", bundle: .app, comment: "Perk name")
+        case .comboKeeper: return String(localized: "COMBO KEEPER", bundle: .app, comment: "Perk name")
+        case .overcharge: return String(localized: "OVERCHARGE", bundle: .app, comment: "Perk name")
+        case .prospector: return String(localized: "PROSPECTOR", bundle: .app, comment: "Perk name")
+        case .efficientEngine: return String(localized: "EFFICIENT ENGINE", bundle: .app, comment: "Perk name")
+        case .secondWind: return String(localized: "SECOND WIND", bundle: .app, comment: "Perk name")
+        case .powerSurge: return String(localized: "POWER SURGE", bundle: .app, comment: "Perk name")
+        case .plating: return String(localized: "EXTRA PLATING", bundle: .app, comment: "Perk name")
+        case .bigHold: return String(localized: "BIG HOLD", bundle: .app, comment: "Perk name")
+        case .reserveTank: return String(localized: "RESERVE TANK", bundle: .app, comment: "Perk name")
+        case .bountyHunter: return String(localized: "BOUNTY HUNTER", bundle: .app, comment: "Perk name")
+        case .daredevil: return String(localized: "DAREDEVIL", bundle: .app, comment: "Perk name")
+        case .rockBreaker: return String(localized: "ROCK BREAKER", bundle: .app, comment: "Perk name")
+        case .bossBreaker: return String(localized: "BOSS BREAKER", bundle: .app, comment: "Perk name")
+        case .autoRepair: return String(localized: "AUTO-REPAIR", bundle: .app, comment: "Perk name")
+        case .thermalCore: return String(localized: "THERMAL CORE", bundle: .app, comment: "Perk name")
         }
     }
 
     var detail: String {
         switch self {
-        case .magnet: return "Treasure nearby flies to you"
-        case .wideBit: return "Bigger bit: easier kills and blocks"
-        case .diamondBit: return "Drill straight through geodes"
-        case .spikedHull: return "Critters that touch you die instead"
-        case .comboKeeper: return "Combo lasts 1.2 s longer"
-        case .overcharge: return "Overdrive comes sooner, lasts longer"
-        case .prospector: return "Ore is worth 30% more"
-        case .efficientEngine: return "Burn 20% less fuel"
-        case .secondWind: return "Survive one more fatal hit"
-        case .powerSurge: return "+1 Power for this run"
-        case .plating: return "+2 armour, repaired now"
-        case .bigHold: return "+8 cargo slots"
-        case .reserveTank: return "Refill now, +5 fuel capacity"
-        case .bountyHunter: return "Critter kills pay 50% more"
-        case .daredevil: return "Close calls refuel more, double combo"
-        case .rockBreaker: return "Every rock you smash pays gold"
-        case .bossBreaker: return "Bosses recover faster: hit them sooner"
-        case .autoRepair: return "Repair 1 armour every 150 m"
-        case .thermalCore: return "Lava can't burn you, frost can't chill"
+        case .magnet: return String(localized: "Treasure nearby flies to you", bundle: .app, comment: "Perk description")
+        case .wideBit: return String(localized: "Bigger bit: easier kills and blocks", bundle: .app, comment: "Perk description")
+        case .diamondBit: return String(localized: "Drill straight through geodes", bundle: .app, comment: "Perk description")
+        case .spikedHull: return String(localized: "Critters that touch you die instead", bundle: .app, comment: "Perk description")
+        case .comboKeeper: return String(localized: "Combo lasts 1.2 s longer", bundle: .app, comment: "Perk description")
+        case .overcharge: return String(localized: "Overdrive comes sooner, lasts longer", bundle: .app, comment: "Perk description")
+        case .prospector: return String(localized: "Ore is worth 30% more", bundle: .app, comment: "Perk description")
+        case .efficientEngine: return String(localized: "Burn 20% less fuel", bundle: .app, comment: "Perk description")
+        case .secondWind: return String(localized: "Survive one more fatal hit", bundle: .app, comment: "Perk description")
+        case .powerSurge: return String(localized: "+1 Power for this run", bundle: .app, comment: "Perk description")
+        case .plating: return String(localized: "+2 armour, repaired now", bundle: .app, comment: "Perk description")
+        case .bigHold: return String(localized: "+8 cargo slots", bundle: .app, comment: "Perk description")
+        case .reserveTank: return String(localized: "Refill now, +5 fuel capacity", bundle: .app, comment: "Perk description")
+        case .bountyHunter: return String(localized: "Critter kills pay 50% more", bundle: .app, comment: "Perk description")
+        case .daredevil: return String(localized: "Close calls refuel more, double combo", bundle: .app, comment: "Perk description")
+        case .rockBreaker: return String(localized: "Every rock you smash pays gold", bundle: .app, comment: "Perk description")
+        case .bossBreaker: return String(localized: "Bosses recover faster: hit them sooner", bundle: .app, comment: "Perk description")
+        case .autoRepair: return String(localized: "Repair 1 armour every 150 m", bundle: .app, comment: "Perk description")
+        case .thermalCore: return String(localized: "Lava can't burn you, frost can't chill", bundle: .app, comment: "Perk description")
         }
     }
 

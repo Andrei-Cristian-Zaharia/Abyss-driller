@@ -9,21 +9,30 @@ import UIKit
 /// Ad unit IDs. Debug builds use Google's public test unit, which always
 /// serves a labelled test ad, so tapping ads while developing can never count
 /// as invalid traffic on the real account. Release builds (TestFlight, App
-/// Store) use the real "Rewarded" unit from the AdMob app (created as "Drill Down").
+/// Store) use the real units from the AdMob app (created as "Drill Down").
 enum AdConfig {
     #if DEBUG
-    static let rewardedUnitID = "ca-app-pub-3940256099942544/1712485313"   // Google test unit
+    static let rewardedUnitID = "ca-app-pub-3940256099942544/1712485313"       // Google test unit
+    static let interstitialUnitID = "ca-app-pub-3940256099942544/4411468910"   // Google test unit
     #else
-    static let rewardedUnitID = "ca-app-pub-8505602361918016/9370180367"   // Abyss Driller · Rewarded
+    static let rewardedUnitID = "ca-app-pub-8505602361918016/9370180367"       // Abyss Driller · Rewarded
+    static let interstitialUnitID = "ca-app-pub-8505602361918016/7927834662"   // Abyss Driller · Interstitial
     #endif
+    /// Interstitial pacing (see `AppModel.leaveResults`): none until a player
+    /// has finished this many runs ever…
+    static let interstitialFreeRuns = 5
+    /// …then at most one per this many runs…
+    static let interstitialEveryRuns = 3
+    /// …and never sooner than this after any full-screen ad, rewarded included.
+    static let interstitialGap: Duration = .seconds(240)
     /// How long a tap on "watch ad" waits for one to finish loading before
     /// the reward is granted anyway.
     static let loadGrace: Duration = .seconds(3)
 }
 
-/// The one rewarded placement: the out-of-fuel refill. Start-up runs consent
-/// (Google UMP, EU/UK only), then Apple's tracking prompt, then the SDK, and
-/// keeps one rewarded ad preloaded. On platforms without the SDK (macOS,
+/// Rewarded ads (fuel refill, free Workshop upgrade) and one interstitial
+/// between runs. Start-up runs consent (Google UMP, EU/UK only), then Apple's
+/// tracking prompt, then the SDK, and keeps one of each ad preloaded. On platforms without the SDK (macOS,
 /// visionOS) every request is simply granted.
 @Observable
 final class AdsManager {
@@ -33,6 +42,9 @@ final class AdsManager {
     /// True when the consent framework says the player must be able to
     /// revisit their choices (shown as a row in Settings).
     private(set) var privacyOptionsRequired = false
+    /// When the last full-screen ad (of either kind) closed; interstitials
+    /// keep their distance from it.
+    private(set) var lastAdClosed: ContinuousClock.Instant?
 
     /// False where the SDK does not exist (macOS, visionOS); ad offers that
     /// would otherwise do nothing are hidden there.
@@ -46,7 +58,10 @@ final class AdsManager {
 
     #if os(iOS) && canImport(GoogleMobileAds)
     private var rewarded: RewardedAd?
-    private let delegate = RewardedDelegate()
+    private let delegate = FullScreenDelegate()
+    private var interstitial: InterstitialAd?
+    private var interstitialLoading = false
+    private let interstitialDelegate = FullScreenDelegate()
     private var started = false
     /// Set by the SDK's reward callback; read when the ad closes.
     private var earned = false
@@ -85,7 +100,19 @@ final class AdsManager {
         guard ConsentInformation.shared.canRequestAds, !sdkStarted else { return }
         sdkStarted = true
         _ = await MobileAds.shared.start()
+        Task { await loadInterstitial() }
         await load()
+    }
+
+    private func loadInterstitial() async {
+        guard interstitial == nil, !interstitialLoading else { return }
+        interstitialLoading = true
+        defer { interstitialLoading = false }
+        do {
+            interstitial = try await InterstitialAd.load(with: AdConfig.interstitialUnitID, request: Request())
+        } catch {
+            interstitial = nil
+        }
     }
 
     private func load() async {
@@ -133,6 +160,7 @@ final class AdsManager {
                 Task {
                     self.rewarded = nil
                     self.state = .idle
+                    self.lastAdClosed = .now
                     // Reward on close, so the run resumes after the ad is gone.
                     granted(self.earned)
                     await self.load()
@@ -145,6 +173,31 @@ final class AdsManager {
         }
         #else
         granted(false)
+        #endif
+    }
+
+    /// Shows the between-runs interstitial if one is loaded, then calls
+    /// `done` once it closes. Never waits: with nothing loaded (or no SDK),
+    /// `done` runs at once and another ad is fetched for next time.
+    func showInterstitial(_ done: @escaping () -> Void) {
+        #if os(iOS) && canImport(GoogleMobileAds)
+        guard let ad = interstitial, state != .showing, let root = Self.topViewController() else {
+            if sdkStarted { Task { await loadInterstitial() } }
+            done()
+            return
+        }
+        interstitial = nil
+        interstitialDelegate.onFinish = {
+            Task {
+                self.lastAdClosed = .now
+                done()
+                await self.loadInterstitial()
+            }
+        }
+        ad.fullScreenContentDelegate = interstitialDelegate
+        ad.present(from: root)
+        #else
+        done()
         #endif
     }
 
@@ -173,7 +226,7 @@ final class AdsManager {
 #if os(iOS) && canImport(GoogleMobileAds)
 /// Full-screen callbacks need an NSObject; this forwards the end of the ad
 /// (closed, or failed to present) to whoever is waiting.
-private final class RewardedDelegate: NSObject, FullScreenContentDelegate {
+private final class FullScreenDelegate: NSObject, FullScreenContentDelegate {
     var onFinish: (() -> Void)?
 
     func adDidDismissFullScreenContent(_ ad: any FullScreenPresentingAd) {

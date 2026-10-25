@@ -12,7 +12,7 @@ This policy explains what information the Abyss Driller mobile game ("the app", 
 
 - **No account, no sign-in.** We never ask for your name, email address, phone number or any other contact details.
 - **Your game progress stays with you.** Gold, best depth, upgrades, Garage parts, Field Guide entries and daily challenge scores are saved on your device and, if iCloud is turned on, synced through your own iCloud account so they follow you to your other devices. Settings stay on the device. We do not run servers and we never receive this data.
-- **Ads are provided by Google AdMob.** The only data that leaves your device is what Google's advertising software collects to show the optional rewarded ads, as described in section 3.
+- **Ads are provided by Google AdMob.** The only data that leaves your device is what Google's advertising software collects to show ads, as described in section 3.
 - **Purchases are handled by Apple.** We never see your payment details (section 4).
 - **You are in control.** You can decline ad tracking, change your consent at any time, and delete all game data by deleting the app.
 
@@ -35,7 +35,7 @@ Deleting the app removes the copy on that device. The iCloud copy stays in your 
 
 ## 3. Advertising (Google AdMob)
 
-The app offers **optional rewarded video ads**: you can choose to watch one for a fuel refill when you run out of fuel, or for a free Workshop upgrade you cannot afford (limited per day). Ads never interrupt gameplay, and watching one is always your choice. If you buy Remove Ads, rewards are granted without an ad and the advertising SDK is not started.
+The app offers **optional rewarded video ads**: you can choose to watch one for a fuel refill when you run out of fuel, or for a free Workshop upgrade you cannot afford (limited per day). Between runs, the app may also show an occasional full-screen ad when you leave the results screen (at most once every few runs). Ads never interrupt gameplay. If you buy Remove Ads, no ads are shown, rewards are granted without an ad, and the advertising SDK is not started.
 
 These ads are served by **Google AdMob** through the Google Mobile Ads SDK. To deliver ads, measure them and prevent fraud, Google may collect and process:
 

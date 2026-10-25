@@ -9,19 +9,19 @@ enum UpgradeTrack: String, CaseIterable, Identifiable, Codable {
 
     var title: String {
         switch self {
-        case .power: return "POWER"
-        case .fuel: return "FUEL"
-        case .armor: return "ARMOR"
-        case .cargo: return "CARGO"
+        case .power: return String(localized: "POWER", bundle: .app, comment: "Workshop upgrade name")
+        case .fuel: return String(localized: "FUEL", bundle: .app, comment: "Workshop upgrade name")
+        case .armor: return String(localized: "ARMOR", bundle: .app, comment: "Workshop upgrade name")
+        case .cargo: return String(localized: "CARGO", bundle: .app, comment: "Workshop upgrade name")
         }
     }
 
     var tagline: String {
         switch self {
-        case .power: return "Bore through harder rock"
-        case .fuel: return "Drill for longer"
-        case .armor: return "Survive more hits"
-        case .cargo: return "Haul more treasure home"
+        case .power: return String(localized: "Bore through harder rock", bundle: .app)
+        case .fuel: return String(localized: "Drill for longer", bundle: .app)
+        case .armor: return String(localized: "Survive more hits", bundle: .app)
+        case .cargo: return String(localized: "Haul more treasure home", bundle: .app)
         }
     }
 
@@ -76,10 +76,10 @@ enum UpgradeTrack: String, CaseIterable, Identifiable, Codable {
     /// What the machine does right now.
     func currentText(level: Int) -> String {
         switch self {
-        case .power: return "Bores hardness \(Self.power(level))"
-        case .fuel:  return "\(Int(Self.fuel(level))) fuel"
-        case .armor: return "\(Self.armor(level)) plates"
-        case .cargo: return "\(Self.cargo(level)) slots"
+        case .power: return String(localized: "Bores hardness \(Self.power(level))", bundle: .app, comment: "Workshop: the rock hardness the drill can break now")
+        case .fuel:  return String(localized: "\(Int(Self.fuel(level))) fuel", bundle: .app, comment: "Workshop: current fuel tank size")
+        case .armor: return String(localized: "\(Self.armor(level)) plates", bundle: .app, comment: "Workshop: current number of armour plates")
+        case .cargo: return String(localized: "\(Self.cargo(level)) slots", bundle: .app, comment: "Workshop: current cargo hold slots")
         }
     }
 
@@ -87,10 +87,10 @@ enum UpgradeTrack: String, CaseIterable, Identifiable, Codable {
     func nextBenefitText(level: Int) -> String {
         let next = level + 1
         switch self {
-        case .power: return "Bore hardness \(Self.power(next)) rock"
-        case .fuel:  return "+10 fuel  →  \(Int(Self.fuel(next)))"
-        case .armor: return "+1 plate  →  \(Self.armor(next)) hits"
-        case .cargo: return "+6 slots  →  \(Self.cargo(next))"
+        case .power: return String(localized: "Bore hardness \(Self.power(next)) rock", bundle: .app, comment: "Workshop: what the next Power level unlocks")
+        case .fuel:  return String(localized: "+10 fuel  →  \(Int(Self.fuel(next)))", bundle: .app, comment: "Workshop: next Fuel level")
+        case .armor: return String(localized: "+1 plate  →  \(Self.armor(next)) hits", bundle: .app, comment: "Workshop: next Armor level")
+        case .cargo: return String(localized: "+6 slots  →  \(Self.cargo(next))", bundle: .app, comment: "Workshop: next Cargo level")
         }
     }
 }
