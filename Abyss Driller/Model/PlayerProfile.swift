@@ -97,6 +97,10 @@ enum ProfileStore {
 
     /// The local save, merged with the iCloud copy if there is one.
     static func load() -> PlayerProfile {
+        #if DEBUG
+        // Director mode plays on a throwaway profile (see `save`).
+        if Director.shared.isActive { return PlayerProfile() }
+        #endif
         let local = decode(UserDefaults.standard.data(forKey: key))
         let cloud = CloudSave.load()
         switch (local, cloud) {
@@ -108,6 +112,10 @@ enum ProfileStore {
     }
 
     static func save(_ profile: PlayerProfile) {
+        #if DEBUG
+        // Scenario cheats must never reach the real (iCloud-synced) save.
+        if Director.shared.isActive { return }
+        #endif
         var stamped = profile
         stamped.savedAt = Date()
         guard let data = try? JSONEncoder().encode(stamped) else { return }

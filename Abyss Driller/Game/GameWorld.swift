@@ -2528,3 +2528,46 @@ final class GameWorld {
         popups.removeAll { $0.y < cutoff }
     }
 }
+
+#if DEBUG
+// MARK: - Director mode hooks (Debug only, see Core/DirectorMode.swift)
+
+extension GameWorld {
+    /// Teleports the drill to `target` metres: clears the shaft, regenerates
+    /// terrain around the new spot, skips bosses whose arenas are above it and
+    /// pushes natural events and perk offers out of the way of the scenario.
+    func debugJump(toDepth target: Double) {
+        let target = max(0, target)
+        obstacles.removeAll()
+        pickups.removeAll()
+        chambers.removeAll()
+        enemies.removeAll()
+        shots.removeAll()
+        lavaPools.removeAll()
+        decor.removeAll()
+        particles.removeAll()
+        popups.removeAll()
+        flying.removeAll()
+        event = nil
+        boss = nil
+        bossPull = .zero
+        wellPull = .zero
+        x = Self.shaftWidth / 2
+        vx = 0
+        vy = 0
+        heading = 0
+        depth = target
+        maxDepth = max(maxDepth, target)
+        trail = [CGPoint(x: x, y: target - 2), CGPoint(x: x, y: target)]
+        anchor = Self.cameraAnchor
+        camera = target - viewHeightMeters * anchor
+        generatedTo = max(0, ((camera - 4) / Self.bandHeight).rounded(.down) * Self.bandHeight)
+        while Self.bossBoundary(bossIndex) <= target { bossIndex += 1 }
+        nextEventDepth = target + 400
+        nextPerkDepth = target + 10_000
+        generateTerrain()
+        // Don't land inside a rock.
+        obstacles.removeAll { hypot($0.x - x, $0.y - depth) < 2.6 }
+    }
+}
+#endif

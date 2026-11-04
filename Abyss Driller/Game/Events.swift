@@ -117,3 +117,14 @@ extension GameWorld {
         }
     }
 }
+
+#if DEBUG
+// MARK: - Director mode hook (Debug only, see Core/DirectorMode.swift)
+
+extension GameWorld {
+    /// Starts `kind` now, replacing any running event.
+    func debugTriggerEvent(_ kind: RunEventKind) {
+        startEvent(kind)
+    }
+}
+#endif
