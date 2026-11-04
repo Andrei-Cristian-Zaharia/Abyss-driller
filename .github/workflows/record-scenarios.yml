@@ -269,15 +269,147 @@ jobs:
             echo "::endgroup::"
           done
 
-      - name: Check every scenario has a clip
+      - name: Validate clips (decode, 30 fps CFR, vertical, duration)
+        id: validate
         run: |
           set -euo pipefail
-          missing=0
+          # Every requested scenario must have a clip that decodes with zero
+          # errors, is h264 yuv420p 1080x1920 at a constant 30 fps (every
+          # frame exactly 1/30 s apart), has no audio/subtitle/data streams,
+          # and lasts within +/-1 s of the requested duration. The summary
+          # goes to the job page and to the `clip-validation` artifact; the
+          # job fails if any clip does not pass.
+          mkdir -p validation
+          checker="$RUNNER_TEMP/check_clip.py"
+          cat > "$checker" <<'PY'
+          import json, subprocess, sys
+          from fractions import Fraction
+
+          scenario, clip, requested, decode_errors = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
+          FPS, WIDTH, HEIGHT, TOLERANCE = 30, 1080, 1920, 1.0
+          problems = []
+          if decode_errors:
+              problems.append(f"{decode_errors} decode errors")
+
+          def probe(*args):
+              out = subprocess.run(["ffprobe", "-v", "error", "-of", "json", *args, clip],
+                                   check=True, capture_output=True, text=True).stdout
+              return json.loads(out)
+
+          def frac(x):
+              try:
+                  return Fraction(x)
+              except (TypeError, ValueError, ZeroDivisionError):
+                  return Fraction(0)
+
+          size = rates = step = duration = "-"
+          try:
+              info = probe("-show_entries",
+                           "stream=codec_type,codec_name,pix_fmt,width,height,r_frame_rate,avg_frame_rate,time_base"
+                           ":format=duration")
+              streams = info.get("streams", [])
+              video = [st for st in streams if st.get("codec_type") == "video"]
+              others = sorted({st.get("codec_type", "?") for st in streams if st.get("codec_type") != "video"})
+              if others:
+                  problems.append("unexpected streams: " + ", ".join(others))
+              if len(video) != 1:
+                  problems.append(f"{len(video)} video streams")
+              if video:
+                  v = video[0]
+                  w, h = int(v.get("width", 0)), int(v.get("height", 0))
+                  size = f"{w}x{h}"
+                  if (w, h) != (WIDTH, HEIGHT):
+                      problems.append(f"size {size}, expected {WIDTH}x{HEIGHT} (vertical)")
+                  if v.get("codec_name") != "h264":
+                      problems.append(f"codec {v.get('codec_name')}, expected h264")
+                  if v.get("pix_fmt") != "yuv420p":
+                      problems.append(f"pix_fmt {v.get('pix_fmt')}, expected yuv420p")
+                  r, avg = frac(v.get("r_frame_rate")), frac(v.get("avg_frame_rate"))
+                  rates = f"{float(r):.3f} / {float(avg):.3f}"
+                  if r != FPS or abs(float(avg) - FPS) > 0.05:
+                      problems.append(f"frame rate {rates}, expected {FPS}")
+                  # Constant frame rate: sorted presentation timestamps must
+                  # all be one frame apart (1 tick of slack for rounding).
+                  tb = frac(v.get("time_base"))
+                  pts = sorted(int(p["pts"]) for p in
+                               probe("-select_streams", "v:0", "-show_entries", "packet=pts").get("packets", [])
+                               if str(p.get("pts", "")).lstrip("-").isdigit())
+                  diffs = [b - a for a, b in zip(pts, pts[1:])]
+                  if tb <= 0 or not diffs:
+                      problems.append("no frame timestamps")
+                  else:
+                      expected = 1 / (tb * FPS)
+                      lo, hi = min(diffs), max(diffs)
+                      step = f"{float(lo * tb * 1000):.2f}-{float(hi * tb * 1000):.2f} ms"
+                      if lo < expected - 1 or hi > expected + 1:
+                          problems.append(f"variable frame spacing {step}, expected {float(1000 / FPS):.2f} ms")
+              d = float(info.get("format", {}).get("duration", "nan"))
+              duration = f"{d:.2f}s"
+              if not abs(d - requested) <= TOLERANCE:
+                  problems.append(f"duration {duration}, expected {requested}s +/- {TOLERANCE:g}s")
+          except (subprocess.CalledProcessError, ValueError, KeyError) as e:
+              problems.append(f"ffprobe failed: {e}")
+
+          result = "PASS" if not problems else "FAIL: " + "; ".join(problems)
+          print(f"| {scenario} | {decode_errors} | {size} | {rates} | {step} | {duration} ({requested}s) | {result} |")
+          for p in problems:
+              print(f"::error title=Clip {scenario} failed validation::{p}", file=sys.stderr)
+          sys.exit(1 if problems else 0)
+          PY
+          summary=validation/summary.md
+          {
+            echo "## Clip validation"
+            echo
+            echo "| Scenario | Decode errors | Size | FPS (r / avg) | Frame spacing | Duration (requested) | Result |"
+            echo "| --- | --- | --- | --- | --- | --- | --- |"
+          } > "$summary"
+          failed=0
           for s in ${SCENARIOS//,/ }; do
-            if [ ! -s "clips/$s.mp4" ]; then echo "::error::Missing clip for $s"; missing=1; fi
+            clip="clips/$s.mp4"
+            requested="$(cat "$DURATIONS_DIR/$s")"
+            if [ ! -s "$clip" ]; then
+              echo "::error title=Clip $s failed validation::missing clip"
+              echo "| $s | - | - | - | - | - (${requested}s) | FAIL: missing clip |" >> "$summary"
+              failed=1
+              continue
+            fi
+            # Full decode of the video stream; every line ffmpeg prints at
+            # level `error` counts, and so does a non-zero exit.
+            errlog="validation/$s.decode.log"
+            ffmpeg -hide_banner -nostdin -v error -i "$clip" -map 0:v:0 -f null - 2>"$errlog" \
+              || echo "ffmpeg exited with status $?" >> "$errlog"
+            errors="$(grep -c . "$errlog" || true)"
+            if [ "$errors" -gt 0 ]; then head -20 "$errlog"; fi
+            if ! python3 "$checker" "$s" "$clip" "$requested" "$errors" >> "$summary"; then failed=1; fi
           done
-          ls -lh clips
-          exit "$missing"
+          {
+            echo
+            if [ "$failed" -eq 0 ]; then echo "All clips passed."; else echo "**Some clips failed validation.**"; fi
+          } >> "$summary"
+          cat "$summary"
+          cat "$summary" >> "$GITHUB_STEP_SUMMARY"
+          ls -lh clips || true
+          exit "$failed"
+
+      - name: Upload validation summary
+        if: always() && steps.validate.outcome != 'skipped'
+        uses: actions/upload-artifact@v4
+        with:
+          name: clip-validation
+          path: validation/
+          retention-days: 1
+          if-no-files-found: warn
+
+      # Clips that failed validation go to a separate artifact for diagnosis,
+      # so nothing downstream imports them as good clips.
+      - name: Upload rejected clips
+        if: failure() && steps.validate.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: rejected-clips
+          path: clips/*.mp4
+          retention-days: 1
+          if-no-files-found: ignore
 
       - name: Upload clips
         uses: actions/upload-artifact@v4
