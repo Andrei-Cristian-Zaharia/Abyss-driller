@@ -27,7 +27,7 @@ concurrency:
 jobs:
   record:
     runs-on: macos-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
       PROJECT: Abyss Driller.xcodeproj
       SCHEME: Abyss Driller
@@ -71,20 +71,41 @@ jobs:
       - name: Pick and boot an iPhone simulator
         run: |
           set -euo pipefail
-          # Newest iOS runtime, first available iPhone on it.
-          udid="$(xcrun simctl list devices available -j | python3 -c '
-          import json, sys, re
-          data = json.load(sys.stdin)["devices"]
-          def version(runtime):
-              return [int(n) for n in re.findall(r"\d+", runtime.split("iOS-")[-1])]
-          for runtime in sorted((r for r in data if ".iOS-" in r), key=version, reverse=True):
-              phones = [d for d in data[runtime] if d["name"].startswith("iPhone") and d.get("isAvailable", True)]
-              pro = [d for d in phones if "Pro" in d["name"] and "Max" not in d["name"]]
-              pick = (pro or phones)
-              if pick:
-                  print(pick[0]["udid"]); break
+          # Newest iOS runtime, smallest iPhone on it. An iPhone SE is 750x1334
+          # (exactly 9:16), so the runner keeps up with recording and the clip
+          # scales cleanly to 1080x1920. A 3x Pro (1206x2622) made simctl drop
+          # frames and write variable-rate, partly corrupt MP4s. If the runtime
+          # supports an SE but none exists, one is created.
+          pick="$(xcrun simctl list -j | python3 -c '
+          import json, sys
+          data = json.load(sys.stdin)
+          devices = data["devices"]
+          small = ["iPhone SE (3rd generation)", "iPhone SE (2nd generation)"]
+          runtimes = [r for r in data["runtimes"]
+                      if r.get("platform", "iOS") == "iOS" and r.get("isAvailable", True)]
+          runtimes.sort(key=lambda r: [int(n) for n in r["version"].split(".") if n.isdigit()], reverse=True)
+          for rt in runtimes:
+              phones = [d for d in devices.get(rt["identifier"], [])
+                        if d["name"].startswith("iPhone") and d.get("isAvailable", True)]
+              for name in small:
+                  for d in phones:
+                      if d["name"] == name:
+                          print("use", d["udid"]); sys.exit()
+              for name in small:
+                  for t in rt.get("supportedDeviceTypes", []):
+                      if t["name"] == name:
+                          print("create", t["identifier"], rt["identifier"]); sys.exit()
+              # No SE on this runtime: avoid the heavier Pro/Plus/Max screens.
+              plain = [d for d in phones if not any(w in d["name"] for w in ("Pro", "Plus", "Max", "Air"))]
+              if plain or phones:
+                  print("use", (plain or phones)[0]["udid"]); sys.exit()
           ')"
-          if [ -z "$udid" ]; then echo "::error::No iPhone simulator available"; exit 1; fi
+          read -r action a b <<<"$pick" || true
+          case "${action:-}" in
+            use) udid="$a" ;;
+            create) udid="$(xcrun simctl create "Recorder iPhone" "$a" "$b")" ;;
+            *) echo "::error::No iPhone simulator available"; exit 1 ;;
+          esac
           xcrun simctl list devices | grep "$udid"
           echo "UDID=$udid" >> "$GITHUB_ENV"
           # Boot now so it comes up while the app builds.
@@ -131,26 +152,82 @@ jobs:
           xcrun simctl status_bar "$UDID" override --time 9:41 --batteryState charged --batteryLevel 100 \
             --wifiBars 3 --cellularBars 4 || true
 
+      - name: Install ffmpeg
+        run: |
+          set -euo pipefail
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1 brew install ffmpeg
+          fi
+          ffmpeg -hide_banner -version | head -1
+
       - name: Record scenarios
         run: |
           set -euo pipefail
-          mkdir -p clips
+          # Job control on: without it bash starts background jobs with SIGINT
+          # ignored, so `kill -INT` would never reach simctl and the MP4 would
+          # be left without its index (truncated / undecodable).
+          set -m
+          mkdir -p raw
           for s in ${SCENARIOS//,/ }; do
             echo "::group::$s"
             xcrun simctl terminate "$UDID" "$BUNDLE_ID" 2>/dev/null || true
-            # The app keeps its autopilot going a little longer than the clip,
-            # so the recording never catches it winding down.
-            xcrun simctl launch "$UDID" "$BUNDLE_ID" -scenario "$s" -scenarioDuration "$((DURATION + 4))"
+            # The autopilot runs a few seconds past the clip, so the recording
+            # never catches it winding down.
+            xcrun simctl launch "$UDID" "$BUNDLE_ID" -scenario "$s" -scenarioDuration "$((DURATION + 6))"
             sleep 2
-            xcrun simctl io "$UDID" recordVideo --codec=h264 --force "clips/$s.mp4" &
+            log="raw/$s.log"
+            : > "$log"
+            xcrun simctl io "$UDID" recordVideo --codec=h264 --force "raw/$s.mp4" >"$log" 2>&1 &
             rec=$!
-            sleep "$DURATION"
-            # SIGINT lets simctl finish writing the MP4.
+            # Time the clip from when simctl actually starts capturing.
+            for _ in $(seq 1 100); do
+              grep -q "Recording started" "$log" && break
+              kill -0 "$rec" 2>/dev/null || { cat "$log"; echo "::error::$s: recordVideo exited early"; exit 1; }
+              sleep 0.1
+            done
+            # One spare second; the encode step trims to the exact duration.
+            sleep "$((DURATION + 1))"
+            # SIGINT makes simctl finalize the MP4; wait for it to finish
+            # writing (up to 60 s) instead of killing it.
             kill -INT "$rec"
-            wait "$rec" || true
+            for _ in $(seq 1 600); do
+              kill -0 "$rec" 2>/dev/null || break
+              sleep 0.1
+            done
+            if kill -0 "$rec" 2>/dev/null; then
+              cat "$log"; echo "::error::$s: recordVideo did not finish after SIGINT"; exit 1
+            fi
+            status=0
+            wait "$rec" || status=$?
+            cat "$log"
+            if [ "$status" -ne 0 ]; then echo "::error::$s: recordVideo exited with $status"; exit 1; fi
             xcrun simctl terminate "$UDID" "$BUNDLE_ID" || true
-            test -s "clips/$s.mp4"
-            ls -lh "clips/$s.mp4"
+            test -s "raw/$s.mp4"
+            ls -lh "raw/$s.mp4"
+            ffprobe -v error -select_streams v:0 \
+              -show_entries stream=codec_name,width,height,avg_frame_rate,r_frame_rate:format=duration \
+              -of default=noprint_wrappers=1 "raw/$s.mp4"
+            echo "::endgroup::"
+          done
+
+      - name: Encode clips (30 fps CFR, 1080x1920, yuv420p, faststart)
+        run: |
+          set -euo pipefail
+          mkdir -p clips
+          # Raw clips only: no text, captions or audio. Titles and voiceover
+          # are added later in Asar Studio.
+          vf="fps=30,scale=1080:1920:force_original_aspect_ratio=decrease:flags=lanczos"
+          vf="$vf,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,format=yuv420p"
+          for s in ${SCENARIOS//,/ }; do
+            echo "::group::$s"
+            ffmpeg -hide_banner -v error -y -i "raw/$s.mp4" \
+              -t "$DURATION" -vf "$vf" -fps_mode cfr -r 30 \
+              -c:v libx264 -preset medium -crf 18 -profile:v high -pix_fmt yuv420p \
+              -g 60 -an -sn -dn -map_metadata -1 -movflags +faststart \
+              "clips/$s.mp4"
+            ffprobe -v error -select_streams v:0 \
+              -show_entries stream=codec_name,pix_fmt,width,height,avg_frame_rate,r_frame_rate,nb_frames:format=duration \
+              -of default=noprint_wrappers=1 "clips/$s.mp4"
             echo "::endgroup::"
           done
 
