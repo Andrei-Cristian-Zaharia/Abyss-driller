@@ -11,6 +11,16 @@ import SwiftUI
 //   -scenarioDuration 35        seconds of autopilot, then the app idles
 //   -scenarioLayer 9            deepBiome/goldRush/caveIn: force a `Strata.layers` index
 //   -scenarioBoss 3             bossFight: force a boss index
+//   -scenarioCapture 36         record this many seconds offline at exactly
+//                               60 fps (Core/DirectorCapture.swift) to
+//                               Documents/DirectorCapture/capture.mp4
+//
+// With -scenarioCapture the wall clock is out of the loop: the game, the
+// autopilot and the garage script run on a virtual clock that advances by
+// exactly 1/60 s per captured frame, and a frame is captured only after the
+// world canvas has drawn it. A slow simulator just takes longer to capture;
+// the clip still plays at normal speed with 60 unique frames per second.
+// (Plain SwiftUI menu animations still run on real time.)
 //
 // Each launch rolls a different moment (biome, depth, boss, rig, perks, fuel,
 // coins, events, early dig / mid run / near death / overdrive) and a
@@ -102,6 +112,11 @@ func eventName(_ kind: RunEventKind) -> String {
     }
 }
 
+/// Director capture's virtual clock, the one thing `GameView` observes.
+@Observable final class DirectorClock {
+    var date = Date(timeIntervalSinceReferenceDate: 0)
+}
+
 final class Director {
     static let shared = Director()
 
@@ -113,6 +128,22 @@ final class Director {
     let bossChoice: Int?
 
     var isActive: Bool { scenario != nil }
+
+    /// `-scenarioCapture <seconds>`: offline 60 fps capture on a virtual clock.
+    let captureSeconds: Double?
+    var isCapturing: Bool { isActive && captureSeconds != nil }
+    static let captureFPS = 60
+    /// Observed by `GameView` while capturing: its date is the virtual clock,
+    /// and changing it is what makes the canvas draw the next frame.
+    let clock = DirectorClock()
+    private(set) var virtualNow: TimeInterval = 0
+    private var captureOrigin: TimeInterval = 0
+    /// First captured frame that shows the run's world canvas (CI measures
+    /// unique frames per second from there on).
+    private(set) var captureRunFrom: Int?
+    #if canImport(UIKit)
+    private var recorder: DirectorRecorder?
+    #endif
 
     /// Terrain seed for the directed run (read by `AppModel.startRun`).
     var terrainSeed: UInt64? { isActive ? stableSeed("terrain:\(seed)") | 1 : nil }
@@ -168,6 +199,8 @@ final class Director {
         requested = name
         let seconds = defaults.double(forKey: "scenarioDuration")
         duration = seconds > 0 ? seconds : 35
+        let capture = defaults.double(forKey: "scenarioCapture")
+        captureSeconds = capture > 0 ? capture : nil
         layerChoice = defaults.object(forKey: "scenarioLayer") != nil ? defaults.integer(forKey: "scenarioLayer") : nil
         bossChoice = defaults.object(forKey: "scenarioBoss") != nil ? defaults.integer(forKey: "scenarioBoss") : nil
         let given = defaults.string(forKey: "scenarioSeed").flatMap { UInt64($0.trimmingCharacters(in: .whitespaces)) }
@@ -371,6 +404,16 @@ final class Director {
         log("PLAN \(planJSON(plan))")
         // The duration covers the whole scenario, menus included.
         startTime = Date().timeIntervalSinceReferenceDate
+        #if canImport(UIKit)
+        if let captureSeconds {
+            captureOrigin = startTime ?? 0
+            virtualNow = captureOrigin
+            clock.date = Date(timeIntervalSinceReferenceDate: virtualNow)
+            let recorder = DirectorRecorder(seconds: captureSeconds, fps: Self.captureFPS)
+            self.recorder = recorder
+            recorder.start()
+        }
+        #endif
         switch scenario {
         case .garageUpgrades:
             runGarageScript(app, plan: plan)
@@ -388,7 +431,12 @@ final class Director {
         giveGold(plan.garageGold)
         app.screen = .garage
         Task { @MainActor in
-            func beat(_ seconds: Double) async { try? await Task.sleep(for: .seconds(seconds)) }
+            func beat(_ seconds: Double) async {
+                guard self.isCapturing else { try? await Task.sleep(for: .seconds(seconds)); return }
+                // Capturing: wait in game time, so the beats keep their length in the clip.
+                let end = self.virtualNow + seconds
+                while self.virtualNow < end { try? await Task.sleep(for: .milliseconds(4)) }
+            }
             await beat(plan.beat * 0.85)
             for (part, upgrades) in plan.garage {
                 app.buy(part)
@@ -678,6 +726,35 @@ final class Director {
         lastRenderFrame = frame
     }
 
+    // MARK: - Offline capture (driven by DirectorRecorder)
+
+    /// True once the screen shows virtual frame `index`: on the run screen
+    /// the world canvas must have drawn the current clock date; menus have
+    /// no canvas to wait for.
+    func captureFrameOnScreen(_ index: Int) -> Bool {
+        guard let app, app.screen == .run, app.world != nil else { return true }
+        guard lastRenderFrame == clock.date else { return false }
+        if captureRunFrom == nil {
+            captureRunFrom = index
+            log("CAPTURE world canvas from frame \(index)")
+        }
+        return true
+    }
+
+    /// Moves everything to virtual frame `index`: exactly 1/60 s of game time
+    /// per frame. Mirrors what `GameView`'s timeline does per tick (paused
+    /// or results showing: the world stands still, the frame is still taken).
+    func captureAdvance(to index: Int) {
+        let previous = virtualNow
+        virtualNow = captureOrigin + Double(index) / Double(Self.captureFPS)
+        if let app, app.screen == .run, let world = app.world, !app.isPaused, app.result == nil {
+            frame(world: world, now: virtualNow)
+            world.debugAdvance(seconds: virtualNow - previous)
+            Audio.shared.updateRun(world, paused: false)
+        }
+        clock.date = Date(timeIntervalSinceReferenceDate: virtualNow)
+    }
+
     /// Logs autopilot mode changes (the per-second line carries the stick).
     private func command(_ kind: String, t: Double) {
         guard kind != lastCommand else { return }
@@ -725,7 +802,7 @@ final class Director {
     }
 
     /// Unbuffered stderr, so lines reach `simctl launch --stderr` at once.
-    private func log(_ line: String) {
+    func log(_ line: String) {
         FileHandle.standardError.write(Data("[Director] \(line)\n".utf8))
     }
 

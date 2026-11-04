@@ -19,20 +19,18 @@ struct GameView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            TimelineView(.animation(paused: app.isPaused || app.result != nil)) { context in
-                ZStack(alignment: .top) {
-                    canvas(frame: context.date)
-                    hud
-                }
-                .onChange(of: context.date) { _, _ in
-                    #if DEBUG
-                    Director.shared.frame(world: world, now: context.date.timeIntervalSinceReferenceDate)
-                    #endif
-                    world.reduceMotion = reduceMotion
-                    world.tick(context.date.timeIntervalSinceReferenceDate)
-                    Audio.shared.updateRun(world, paused: app.isPaused)
-                }
+            #if DEBUG
+            if Director.shared.isCapturing {
+                // Offline 60 fps capture: Director steps the world by exactly
+                // 1/60 s per captured frame and moves this clock, which is
+                // what redraws the play area (no real-time timeline).
+                playArea(frame: Director.shared.clock.date)
+            } else {
+                timeline
             }
+            #else
+            timeline
+            #endif
 
             if app.runPhase == .ready { readyPrompt }
             if app.runPhase == .choosing, !world.perkOffer.isEmpty { PerkOverlay(world: world) }
@@ -63,6 +61,28 @@ struct GameView: View {
     }
 
     // MARK: - Play area
+
+    /// The normal loop: redraw and advance the sim on every display frame.
+    private var timeline: some View {
+        TimelineView(.animation(paused: app.isPaused || app.result != nil)) { context in
+            playArea(frame: context.date)
+                .onChange(of: context.date) { _, _ in
+                    #if DEBUG
+                    Director.shared.frame(world: world, now: context.date.timeIntervalSinceReferenceDate)
+                    #endif
+                    world.reduceMotion = reduceMotion
+                    world.tick(context.date.timeIntervalSinceReferenceDate)
+                    Audio.shared.updateRun(world, paused: app.isPaused)
+                }
+        }
+    }
+
+    private func playArea(frame: Date) -> some View {
+        ZStack(alignment: .top) {
+            canvas(frame: frame)
+            hud
+        }
+    }
 
     /// `frame` is the timeline's date. `GameWorld` is not observable, so
     /// without a value that changes every frame SwiftUI may see the canvas

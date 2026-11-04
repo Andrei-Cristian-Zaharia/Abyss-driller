@@ -37,7 +37,8 @@ concurrency:
 jobs:
   record:
     runs-on: macos-latest
-    timeout-minutes: 45
+    # Offline 60 fps capture runs slower than real time on the runner.
+    timeout-minutes: 150
     env:
       PROJECT: Abyss Driller.xcodeproj
       SCHEME: Abyss Driller
@@ -60,6 +61,14 @@ jobs:
       MAX_FROZEN_PCT: "30"
       MIN_CHANGED_AREA_PCT: "1.0"
       MIN_UNIQUE_PCT: "25"
+      # Output frame rate, and the real one: unique frames per second
+      # (mpdecimate on the world area, from the first frame of the run)
+      # must average at least this much, or the clip fails.
+      FPS: "60"
+      MIN_UNIQUE_FPS: "55"
+      # Give up on a capture that runs more than this many times slower
+      # than real time.
+      CAPTURE_SLOWDOWN_MAX: "20"
     steps:
       - uses: actions/checkout@v4
 
@@ -246,10 +255,11 @@ jobs:
       - name: Record scenarios
         run: |
           set -euo pipefail
-          # Job control on: without it bash starts background jobs with SIGINT
-          # ignored, so `kill -INT` would never reach simctl and the MP4 would
-          # be left without its index (truncated / undecodable).
-          set -m
+          # No `simctl io recordVideo`: a screen recording of this GPU-less
+          # simulator only got the ~30 frames per second it could draw in
+          # real time. The app records offline at exactly 60 fps instead
+          # (Core/DirectorCapture.swift) and the clip is copied out of its
+          # data container.
           mkdir -p raw plans
           : > "$CLIPS_TSV"
           keys="$RUNNER_TEMP/keys.txt"
@@ -269,9 +279,9 @@ jobs:
             # (`[Director] PLAN {json}`). If its scenario+parameters repeat an
             # earlier clip of this run, re-roll with another seed before
             # recording anything.
-            # The autopilot's clock starts when the app appears, before the
-            # recording does; it runs well past the clip, so the recording
-            # never catches it winding down.
+            # Capture starts when the app appears, on the same virtual clock
+            # as the autopilot; the autopilot runs well past the clip, so the
+            # clip never catches it winding down.
             # Director mode logs to stderr (render fps, pause state, drill and
             # camera position every second, autopilot commands); it is
             # printed below so it shows in the Actions log.
@@ -284,7 +294,8 @@ jobs:
               applog="$PWD/raw/clip$i.director.log"
               : > "$applog"
               xcrun simctl launch --stderr="$applog" "$UDID" "$BUNDLE_ID" \
-                -scenario "$req" -scenarioSeed "$cs" -scenarioDuration "$((launchdur + 12))" </dev/null
+                -scenario "$req" -scenarioSeed "$cs" -scenarioDuration "$((launchdur + 12))" \
+                -scenarioCapture "$((launchdur + 1))" </dev/null
               for _ in $(seq 1 200); do
                 grep -q '\[Director\] PLAN ' "$applog" && break
                 sleep 0.1
@@ -318,34 +329,35 @@ jobs:
             applog="$PWD/raw/$id.director.log"
             echo "::group::$id (${duration}s) $key"
             echo "Plan: $plan"
-            sleep 1
             s="$id"
-            log="raw/$s.log"
-            : > "$log"
-            xcrun simctl io "$UDID" recordVideo --codec=h264 --force "raw/$s.mp4" >"$log" 2>&1 &
-            rec=$!
-            # Time the clip from when simctl actually starts capturing.
-            for _ in $(seq 1 100); do
-              grep -q "Recording started" "$log" && break
-              kill -0 "$rec" 2>/dev/null || { cat "$log"; echo "::error::$s: recordVideo exited early"; exit 1; }
-              sleep 0.1
+            # The app captures the clip itself (-scenarioCapture): it steps
+            # the game by exactly 1/60 s per frame and grabs each frame after
+            # it is drawn, so the runner's speed only changes how long this
+            # takes, not the clip. Wait for its CAPTURE done/failed line.
+            limit=$(( (launchdur + 1) * CAPTURE_SLOWDOWN_MAX + 120 ))
+            done_line=""
+            started=$SECONDS
+            while [ $((SECONDS - started)) -lt "$limit" ]; do
+              done_line="$(grep -m1 -E '\[Director\] CAPTURE (done|failed)' "$applog" || true)"
+              [ -n "$done_line" ] && break
+              sleep 2
             done
-            # One spare second; the encode step trims to the exact duration.
-            sleep "$((duration + 1))"
-            # SIGINT makes simctl finalize the MP4; wait for it to finish
-            # writing (up to 60 s) instead of killing it.
-            kill -INT "$rec"
-            for _ in $(seq 1 600); do
-              kill -0 "$rec" 2>/dev/null || break
-              sleep 0.1
-            done
-            if kill -0 "$rec" 2>/dev/null; then
-              cat "$log"; echo "::error::$s: recordVideo did not finish after SIGINT"; exit 1
+            grep '\[Director\] CAPTURE' "$applog" || true
+            if [ -z "$done_line" ]; then
+              tail -50 "$applog"
+              echo "::error::$s: the in-app 60 fps capture did not finish within ${limit}s (see the CAPTURE progress lines above)"; exit 1
             fi
-            status=0
-            wait "$rec" || status=$?
-            cat "$log"
-            if [ "$status" -ne 0 ]; then echo "::error::$s: recordVideo exited with $status"; exit 1; fi
+            if [[ "$done_line" == *"CAPTURE failed"* ]]; then
+              tail -50 "$applog"
+              echo "::error::$s: ${done_line#*\[Director\] }"; exit 1
+            fi
+            run_from="$(sed -n 's/.*runFrom=\([0-9][0-9]*\).*/\1/p' <<<"$done_line")"
+            stale="$(sed -n 's/.*staleFrames=\([0-9][0-9]*\).*/\1/p' <<<"$done_line")"
+            if [ "${stale:-0}" -gt 0 ]; then
+              echo "::warning title=Capture $s::${stale} frames were captured before the world canvas confirmed the new frame"
+            fi
+            container="$(xcrun simctl get_app_container "$UDID" "$BUNDLE_ID" data)"
+            cp "$container/Documents/DirectorCapture/capture.mp4" "raw/$s.mp4"
             xcrun simctl terminate "$UDID" "$BUNDLE_ID" || true
             echo "--- Director log ($s) ---"
             grep '\[Director\]' "$applog" || echo "(no Director output)"
@@ -358,27 +370,30 @@ jobs:
               -show_entries stream=codec_name,width,height,avg_frame_rate,r_frame_rate:format=duration \
               -of default=noprint_wrappers=1 "raw/$s.mp4"
             echo "::endgroup::"
-            printf '%s\t%s\t%s\t%s\n' "$id" "${id%_seed*}" "$clip_seed" "$duration" >> "$CLIPS_TSV"
+            # 5th column: first frame showing the run's world (-1 = never).
+            printf '%s\t%s\t%s\t%s\t%s\n' "$id" "${id%_seed*}" "$clip_seed" "$duration" "${run_from:--1}" >> "$CLIPS_TSV"
             i=$((i + 1))
           done 3< "$REQUESTS"
           if ! [ -s "$CLIPS_TSV" ]; then echo "::error::No clips were recorded"; exit 1; fi
           echo "Recorded clips (base seed $SEED):"
           cat "$CLIPS_TSV"
 
-      - name: Encode clips (30 fps CFR, 1080x1920, yuv420p, faststart)
+      - name: Encode clips (60 fps CFR, 1080x1920, yuv420p, faststart)
         run: |
           set -euo pipefail
           mkdir -p clips
           # Raw clips only: no text, captions or audio. Titles and voiceover
-          # are added later in Asar Studio.
-          vf="fps=30,scale=1080:1920:force_original_aspect_ratio=decrease:flags=lanczos"
+          # are added later in Asar Studio. The capture is already exactly
+          # 60 fps (one frame per 1/60 s game step), so `fps` changes nothing
+          # but guarantees CFR timestamps.
+          vf="fps=$FPS,scale=1080:1920:force_original_aspect_ratio=decrease:flags=lanczos"
           vf="$vf,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,format=yuv420p"
-          while IFS=$'\t' read -r s _ _ duration <&3; do
+          while IFS=$'\t' read -r s _ _ duration _ <&3; do
             echo "::group::$s (${duration}s)"
             ffmpeg -hide_banner -v error -y -i "raw/$s.mp4" \
-              -t "$duration" -vf "$vf" -fps_mode cfr -r 30 \
+              -t "$duration" -vf "$vf" -fps_mode cfr -r "$FPS" \
               -c:v libx264 -preset medium -crf 18 -profile:v high -pix_fmt yuv420p \
-              -g 60 -an -sn -dn -map_metadata -1 -movflags +faststart \
+              -g "$((FPS * 2))" -an -sn -dn -map_metadata -1 -movflags +faststart \
               "clips/$s.mp4"
             ffprobe -v error -select_streams v:0 \
               -show_entries stream=codec_name,pix_fmt,width,height,avg_frame_rate,r_frame_rate,nb_frames:format=duration \
@@ -386,13 +401,14 @@ jobs:
             echo "::endgroup::"
           done 3< "$CLIPS_TSV"
 
-      - name: Validate clips (decode, 30 fps CFR, vertical, duration, not static)
+      - name: Validate clips (decode, 60 fps CFR, real 60 fps, vertical, duration, not static)
         id: validate
         run: |
           set -euo pipefail
           # Every requested scenario must have a clip that decodes with zero
-          # errors, is h264 yuv420p 1080x1920 at a constant 30 fps (every
-          # frame exactly 1/30 s apart), has no audio/subtitle/data streams,
+          # errors, is h264 yuv420p 1080x1920 at a constant 60 fps (every
+          # frame exactly 1/60 s apart) with at least MIN_UNIQUE_FPS unique
+          # frames per second in the world area (real fps, not duplicates), has no audio/subtitle/data streams,
           # and lasts within +/-1 s of the requested duration. The summary
           # goes to the job page and to the `clip-validation` artifact; the
           # job fails if any clip does not pass.
@@ -402,8 +418,10 @@ jobs:
           import json, subprocess, sys
           from fractions import Fraction
 
+          import os
           scenario, clip, requested, decode_errors = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
-          FPS, WIDTH, HEIGHT, TOLERANCE = 30, 1080, 1920, 1.0
+          run_from = int(sys.argv[5]) if len(sys.argv) > 5 else 0   # first world frame, -1 = none
+          FPS, WIDTH, HEIGHT, TOLERANCE = int(os.environ.get("FPS", "60")), 1080, 1920, 1.0
           problems = []
           if decode_errors:
               problems.append(f"{decode_errors} decode errors")
@@ -481,7 +499,8 @@ jobs:
           MAX_FROZEN = float(os.environ.get("MAX_FROZEN_PCT", "30"))
           MIN_AREA = float(os.environ.get("MIN_CHANGED_AREA_PCT", "1.0"))
           MIN_UNIQUE = float(os.environ.get("MIN_UNIQUE_PCT", "25"))
-          frozen_txt = area_txt = unique_txt = "-"
+          MIN_UNIQUE_FPS = float(os.environ.get("MIN_UNIQUE_FPS", "55"))
+          frozen_txt = area_txt = unique_txt = real_txt = "-"
 
           def ffmpeg_filter(vf, level="info", fmt="null"):
               run = subprocess.run(["ffmpeg", "-hide_banner", "-nostdin", "-v", level, "-i", clip,
@@ -528,12 +547,48 @@ jobs:
               unique_txt = f"{unique:.0f}% ({kept}/{total})"
               if unique < MIN_UNIQUE:
                   problems.append(f"only {unique_txt} unique frames (mpdecimate), min {MIN_UNIQUE:g}%")
+
+              # Real frame rate: unique frames per second in the world area
+              # (middle 60% of the height, so the HUD and the joystick do not
+              # count), from the first frame that shows the run. mpdecimate is
+              # tighter than its defaults so small but real motion counts,
+              # while re-encoded duplicates (near-zero difference) still drop.
+              if run_from < 0:
+                  problems.append("the run's world never appeared in the capture")
+              else:
+                  start = run_from / FPS
+                  out, _ = ffmpeg_filter("crop=iw:ih*0.6:0:ih*0.2,mpdecimate=hi=256:lo=128:frac=0.1",
+                                         level="error", fmt="framemd5")
+                  # framemd5 lines: stream, dts, pts, duration, size, md5;
+                  # timestamps are in the `#tb 0: n/d` of its own header.
+                  stamps, out_tb = [], Fraction(0)
+                  for line in out.splitlines():
+                      m = re.match(r"#tb 0:\s*(\d+)/(\d+)", line)
+                      if m:
+                          out_tb = Fraction(int(m.group(1)), int(m.group(2)))
+                      elif line and not line.startswith("#"):
+                          f = [x.strip() for x in line.split(",")]
+                          if len(f) >= 4 and f[2].lstrip("-").isdigit():
+                              stamps.append(int(f[2]))
+                  times = [float(p * out_tb) for p in stamps] if out_tb > 0 else []
+                  span = clip_len - start
+                  world_kept = sum(1 for t in times if t >= start - 1e-6)
+                  real_fps = world_kept / span if span > 0 else 0
+                  real_txt = f"{real_fps:.1f}"
+                  print(f"{scenario}: declared {rates} fps, real {real_fps:.1f} unique fps in the world area "
+                        f"({world_kept} unique frames over {span:.2f}s from {start:.2f}s)", file=sys.stderr)
+                  if not times:
+                      problems.append("unique-frame analysis produced no data")
+                  elif real_fps < MIN_UNIQUE_FPS:
+                      problems.append(f"only {real_fps:.1f} unique frames per second in the world area "
+                                      f"(mpdecimate, from {start:.2f}s), need at least {MIN_UNIQUE_FPS:g}: "
+                                      f"the {FPS} fps clip is padded with duplicate frames")
           except (OSError, ValueError) as e:
               problems.append(f"motion analysis failed: {e}")
 
           result = "PASS" if not problems else "FAIL: " + "; ".join(problems)
           print(f"| {scenario} | {decode_errors} | {size} | {rates} | {step} | {duration} ({requested}s) "
-                f"| {frozen_txt} | {area_txt} | {unique_txt} | {result} |")
+                f"| {frozen_txt} | {area_txt} | {unique_txt} | {real_txt} | {result} |")
           for p in problems:
               print(f"::error title=Clip {scenario} failed validation::{p}", file=sys.stderr)
           sys.exit(1 if problems else 0)
@@ -544,17 +599,17 @@ jobs:
             echo
             echo "Base seed: \`$SEED\`"
             echo
-            echo "| Clip | Decode errors | Size | FPS (r / avg) | Frame spacing | Duration (requested) | Frozen | Changed area | Unique frames | Result |"
-            echo "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"
+            echo "| Clip | Decode errors | Size | FPS (r / avg) | Frame spacing | Duration (requested) | Frozen | Changed area | Unique frames | Real fps (world) | Result |"
+            echo "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"
           } > "$summary"
           failed=0
           results="$RUNNER_TEMP/results.tsv"
           : > "$results"
-          while IFS=$'\t' read -r s _ _ requested <&3; do
+          while IFS=$'\t' read -r s _ _ requested run_from <&3; do
             clip="clips/$s.mp4"
             if [ ! -s "$clip" ]; then
               echo "::error title=Clip $s failed validation::missing clip"
-              echo "| $s | - | - | - | - | - (${requested}s) | - | - | - | FAIL: missing clip |" >> "$summary"
+              echo "| $s | - | - | - | - | - (${requested}s) | - | - | - | - | FAIL: missing clip |" >> "$summary"
               printf '%s\t%s\n' "$s" "FAIL: missing clip" >> "$results"
               failed=1
               continue
@@ -566,7 +621,7 @@ jobs:
               || echo "ffmpeg exited with status $?" >> "$errlog"
             errors="$(grep -c . "$errlog" || true)"
             if [ "$errors" -gt 0 ]; then head -20 "$errlog"; fi
-            row="$(python3 "$checker" "$s" "$clip" "$requested" "$errors")" || failed=1
+            row="$(python3 "$checker" "$s" "$clip" "$requested" "$errors" "${run_from:-0}")" || failed=1
             echo "$row" >> "$summary"
             printf '%s\t%s\n' "$s" "$(echo "$row" | awk -F' [|] ' '{print $(NF)}' | sed 's/ *|$//')" >> "$results"
           done 3< "$CLIPS_TSV"
