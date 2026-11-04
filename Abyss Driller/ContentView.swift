@@ -50,18 +50,28 @@ struct ContentView: View {
         .preferredColorScheme(.dark)
         // Consent → tracking prompt → ad SDK, then keep one rewarded ad ready.
         .task {
-            CloudSave.observe { cloud in app.mergeCloudSave(cloud) }
+            #if DEBUG
+            // Director mode records footage: no consent/ATT prompts, ads or
+            // cloud merges on top of it.
+            let directed = Director.shared.isActive
+            #else
+            let directed = false
+            #endif
+            if !directed { CloudSave.observe { cloud in app.mergeCloudSave(cloud) } }
             Audio.shared.start()
             Audio.shared.play(app.screen == .run ? .biome(0) : .menu)
-            if !app.adsRemoved { app.ads.start() }
-            app.store.start()     // prices, purchase updates, restored entitlements
+            if !app.adsRemoved && !directed { app.ads.start() }
+            if !directed { app.store.start() }     // prices, purchase updates, restored entitlements
         }
         #if DEBUG
         // Screenshot/automation hook: `-autoDrill` opens straight into a run.
         // There is no test target, so this is how the run screen gets verified
-        // against real device safe areas.
+        // against real device safe areas. `-scenario <name>` runs a scripted
+        // Director mode scenario instead (Core/DirectorMode.swift).
         .onAppear {
-            if ProcessInfo.processInfo.arguments.contains("-autoDrill"), app.screen == .home {
+            if Director.shared.isActive {
+                Director.shared.begin(app: app)
+            } else if ProcessInfo.processInfo.arguments.contains("-autoDrill"), app.screen == .home {
                 app.startRun()
             }
         }
