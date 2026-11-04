@@ -442,6 +442,19 @@ final class GameWorld {
         }
     }
 
+    #if DEBUG
+    /// Director capture: advance exactly `seconds` of game time in fixed
+    /// 1/120 s steps (two per 1/60 s video frame), with no wall clock and no
+    /// accumulator rounding, so every captured frame is the same slice of time.
+    func debugAdvance(seconds: Double) {
+        let count = max(0, Int((seconds * 120).rounded()))
+        for _ in 0..<count { advance(1.0 / 120.0) }
+        stepsRun += count
+        lastTime = nil
+        accumulator = 0
+    }
+    #endif
+
     // MARK: - Simulation
 
     private func advance(_ step: Double) {
