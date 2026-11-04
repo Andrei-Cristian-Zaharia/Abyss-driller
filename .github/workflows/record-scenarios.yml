@@ -6,10 +6,20 @@ name: Record scenarios
 on:
   workflow_dispatch:
     inputs:
-      scenarios:
-        description: "Comma-separated scenarios (bossFight,goldRush,caveIn,deepBiome,garageUpgrades) or 'all'"
+      scenario:
+        description: "'random' (a random type per clip), one type (bossFight, goldRush, caveIn, deepBiome, garageUpgrades), a comma list, or 'all' (cycles through the types)"
         required: false
-        default: all
+        default: random
+        type: string
+      count:
+        description: "How many clips to record (1-12)"
+        required: false
+        default: "5"
+        type: string
+      seed:
+        description: "Base seed (whole number) to reproduce a run; blank = new random seed. Clip i uses seed+i (see the manifest)."
+        required: false
+        default: ""
         type: string
       duration:
         description: "Seconds per scenario: blank = per-scenario defaults (30-40 s), a number for all (e.g. 35), or overrides (e.g. bossFight=40,caveIn=32)"
@@ -41,6 +51,10 @@ jobs:
       DEFAULT_DURATIONS: bossFight=40,goldRush=35,caveIn=35,deepBiome=30,garageUpgrades=40
       MIN_DURATION: "5"
       MAX_DURATION: "120"
+      MAX_COUNT: "12"
+      # A clip whose scenario+parameters repeat an earlier clip of the run is
+      # re-rolled with a new seed, at most this many times, then skipped.
+      MAX_REROLLS: "6"
       # Static-clip rejection (see the validate step): most of a clip frozen,
       # a scene that changes only in a tiny area, or almost no unique frames.
       MAX_FROZEN_PCT: "30"
@@ -51,18 +65,44 @@ jobs:
 
       - name: Validate inputs
         env:
-          IN_SCENARIOS: ${{ inputs.scenarios }}
+          IN_SCENARIO: ${{ inputs.scenario }}
+          IN_COUNT: ${{ inputs.count }}
+          IN_SEED: ${{ inputs.seed }}
           IN_DURATION: ${{ inputs.duration }}
         run: |
           set -euo pipefail
-          scenarios="$(echo "${IN_SCENARIOS:-all}" | tr -d '[:space:]')"
-          if [ -z "$scenarios" ] || [ "$scenarios" = "all" ]; then scenarios="$ALL_SCENARIOS"; fi
+          scenarios="$(echo "${IN_SCENARIO:-random}" | tr -d '[:space:]')"
+          if [ -z "$scenarios" ]; then scenarios=random; fi
+          if [ "$scenarios" = "all" ]; then scenarios="$ALL_SCENARIOS"; fi
           for s in ${scenarios//,/ }; do
-            case ",$ALL_SCENARIOS," in
+            case ",$ALL_SCENARIOS,random," in
               *",$s,"*) ;;
-              *) echo "::error::Unknown scenario '$s' (allowed: $ALL_SCENARIOS)"; exit 1 ;;
+              *) echo "::error::Unknown scenario '$s' (allowed: random, all, $ALL_SCENARIOS)"; exit 1 ;;
             esac
           done
+          count="$(echo "${IN_COUNT:-5}" | tr -d '[:space:]')"
+          if ! [[ "$count" =~ ^[0-9]+$ ]] || [ "$count" -lt 1 ] || [ "$count" -gt "$MAX_COUNT" ]; then
+            echo "::error::count must be a whole number between 1 and $MAX_COUNT (got '$count')"; exit 1
+          fi
+          seed="$(echo "${IN_SEED:-}" | tr -d '[:space:]')"
+          if [ -z "$seed" ]; then
+            # New every run: clock, run id and attempt mixed, kept to 9 digits.
+            seed=$(( ( ($(date +%s) * 32768 + RANDOM) ^ (GITHUB_RUN_ID * 2654435761) ^ GITHUB_RUN_ATTEMPT ) % 1000000000 ))
+            seed=${seed#-}
+          elif ! [[ "$seed" =~ ^[0-9]{1,15}$ ]]; then
+            echo "::error::seed must be a whole number of up to 15 digits (got '$seed')"; exit 1
+          fi
+          seed=$((10#$seed))
+          echo "::notice title=Recording seed::seed=$seed (re-run with this seed, the same scenario input and count to reproduce)"
+          echo "Base seed: $seed"
+          # The clip plan: one scenario request per clip, cycling the list.
+          read -r -a list <<<"${scenarios//,/ }"
+          : > "$RUNNER_TEMP/requests.txt"
+          for ((i = 0; i < count; i++)); do echo "${list[i % ${#list[@]}]}" >> "$RUNNER_TEMP/requests.txt"; done
+          {
+            echo "**Seed:** \`$seed\` · **Clips:** $count · **Scenario:** \`$scenarios\`"
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
           # One file per scenario holding its clip length in seconds:
           # defaults first, then the input (a number for all, or s=n pairs).
           dir="$RUNNER_TEMP/durations"
@@ -92,11 +132,14 @@ jobs:
           fi
           echo "| Scenario | Seconds |" >> "$GITHUB_STEP_SUMMARY"
           echo "| --- | --- |" >> "$GITHUB_STEP_SUMMARY"
-          for s in ${scenarios//,/ }; do
+          for s in ${ALL_SCENARIOS//,/ }; do
             echo "$s: $(cat "$dir/$s") s"
             echo "| $s | $(cat "$dir/$s") |" >> "$GITHUB_STEP_SUMMARY"
           done
-          echo "SCENARIOS=$scenarios" >> "$GITHUB_ENV"
+          echo "SEED=$seed" >> "$GITHUB_ENV"
+          echo "REQUESTS=$RUNNER_TEMP/requests.txt" >> "$GITHUB_ENV"
+          # Written by the record step: id, scenario, seed, seconds per clip.
+          echo "CLIPS_TSV=$RUNNER_TEMP/clips.tsv" >> "$GITHUB_ENV"
           echo "DURATIONS_DIR=$dir" >> "$GITHUB_ENV"
 
       - name: Select newest Xcode
@@ -207,22 +250,76 @@ jobs:
           # ignored, so `kill -INT` would never reach simctl and the MP4 would
           # be left without its index (truncated / undecodable).
           set -m
-          mkdir -p raw
-          for s in ${SCENARIOS//,/ }; do
-            duration="$(cat "$DURATIONS_DIR/$s")"
-            echo "::group::$s (${duration}s)"
-            xcrun simctl terminate "$UDID" "$BUNDLE_ID" 2>/dev/null || true
+          mkdir -p raw plans
+          : > "$CLIPS_TSV"
+          keys="$RUNNER_TEMP/keys.txt"
+          : > "$keys"
+          # A `random` request learns its type only from the app's PLAN line,
+          # so its autopilot runs for the longest clip length.
+          maxdur=0
+          for f in "$DURATIONS_DIR"/*; do
+            d="$(cat "$f")"
+            if [ "$d" -gt "$maxdur" ]; then maxdur="$d"; fi
+          done
+          i=0
+          # fd 3: simctl and python must not eat the request list on stdin.
+          while read -r req <&3; do
+            [ -n "$req" ] || continue
+            # Launch with a seed and read the moment Director mode rolled
+            # (`[Director] PLAN {json}`). If its scenario+parameters repeat an
+            # earlier clip of this run, re-roll with another seed before
+            # recording anything.
             # The autopilot's clock starts when the app appears, before the
             # recording does; it runs well past the clip, so the recording
             # never catches it winding down.
             # Director mode logs to stderr (render fps, pause state, drill and
             # camera position every second, autopilot commands); it is
             # printed below so it shows in the Actions log.
-            applog="$PWD/raw/$s.director.log"
-            : > "$applog"
-            xcrun simctl launch --stderr="$applog" "$UDID" "$BUNDLE_ID" \
-              -scenario "$s" -scenarioDuration "$((duration + 12))"
-            sleep 2
+            clip_seed=""
+            plan=""
+            for ((attempt = 0; attempt <= MAX_REROLLS; attempt++)); do
+              cs=$(( SEED + i + attempt * 1000 ))
+              if [ "$req" = random ]; then launchdur="$maxdur"; else launchdur="$(cat "$DURATIONS_DIR/$req")"; fi
+              xcrun simctl terminate "$UDID" "$BUNDLE_ID" 2>/dev/null || true
+              applog="$PWD/raw/clip$i.director.log"
+              : > "$applog"
+              xcrun simctl launch --stderr="$applog" "$UDID" "$BUNDLE_ID" \
+                -scenario "$req" -scenarioSeed "$cs" -scenarioDuration "$((launchdur + 12))" </dev/null
+              for _ in $(seq 1 200); do
+                grep -q '\[Director\] PLAN ' "$applog" && break
+                sleep 0.1
+              done
+              line="$(grep -m1 '\[Director\] PLAN ' "$applog" | sed 's/^.*\[Director\] PLAN //' || true)"
+              if [ -z "$line" ]; then
+                cat "$applog"; echo "::error::clip $i ($req, seed $cs): Director mode printed no PLAN line"; exit 1
+              fi
+              IFS=$'\t' read -r s key <<<"$(python3 -c 'import json, sys; d = json.loads(sys.argv[1]); print(d["scenario"] + "\t" + d["key"])' "$line")"
+              if grep -Fxq "$key" "$keys"; then
+                echo "clip $i: seed $cs repeats an earlier clip ($key), re-rolling"
+                xcrun simctl terminate "$UDID" "$BUNDLE_ID" 2>/dev/null || true
+                continue
+              fi
+              clip_seed="$cs"
+              plan="$line"
+              break
+            done
+            if [ -z "$clip_seed" ]; then
+              echo "::warning::clip $i ($req): every re-roll repeated an earlier clip, skipped"
+              xcrun simctl terminate "$UDID" "$BUNDLE_ID" 2>/dev/null || true
+              i=$((i + 1))
+              continue
+            fi
+            echo "$key" >> "$keys"
+            id="${s}_seed${clip_seed}"
+            duration="$(cat "$DURATIONS_DIR/$s")"
+            echo "$plan" > "plans/$id.json"
+            # Same file, new name; the app keeps writing into it.
+            mv "$applog" "raw/$id.director.log"
+            applog="$PWD/raw/$id.director.log"
+            echo "::group::$id (${duration}s) $key"
+            echo "Plan: $plan"
+            sleep 1
+            s="$id"
             log="raw/$s.log"
             : > "$log"
             xcrun simctl io "$UDID" recordVideo --codec=h264 --force "raw/$s.mp4" >"$log" 2>&1 &
@@ -261,7 +358,12 @@ jobs:
               -show_entries stream=codec_name,width,height,avg_frame_rate,r_frame_rate:format=duration \
               -of default=noprint_wrappers=1 "raw/$s.mp4"
             echo "::endgroup::"
-          done
+            printf '%s\t%s\t%s\t%s\n' "$id" "${id%_seed*}" "$clip_seed" "$duration" >> "$CLIPS_TSV"
+            i=$((i + 1))
+          done 3< "$REQUESTS"
+          if ! [ -s "$CLIPS_TSV" ]; then echo "::error::No clips were recorded"; exit 1; fi
+          echo "Recorded clips (base seed $SEED):"
+          cat "$CLIPS_TSV"
 
       - name: Encode clips (30 fps CFR, 1080x1920, yuv420p, faststart)
         run: |
@@ -271,8 +373,7 @@ jobs:
           # are added later in Asar Studio.
           vf="fps=30,scale=1080:1920:force_original_aspect_ratio=decrease:flags=lanczos"
           vf="$vf,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,format=yuv420p"
-          for s in ${SCENARIOS//,/ }; do
-            duration="$(cat "$DURATIONS_DIR/$s")"
+          while IFS=$'\t' read -r s _ _ duration <&3; do
             echo "::group::$s (${duration}s)"
             ffmpeg -hide_banner -v error -y -i "raw/$s.mp4" \
               -t "$duration" -vf "$vf" -fps_mode cfr -r 30 \
@@ -283,7 +384,7 @@ jobs:
               -show_entries stream=codec_name,pix_fmt,width,height,avg_frame_rate,r_frame_rate,nb_frames:format=duration \
               -of default=noprint_wrappers=1 "clips/$s.mp4"
             echo "::endgroup::"
-          done
+          done 3< "$CLIPS_TSV"
 
       - name: Validate clips (decode, 30 fps CFR, vertical, duration, not static)
         id: validate
@@ -441,16 +542,20 @@ jobs:
           {
             echo "## Clip validation"
             echo
-            echo "| Scenario | Decode errors | Size | FPS (r / avg) | Frame spacing | Duration (requested) | Frozen | Changed area | Unique frames | Result |"
+            echo "Base seed: \`$SEED\`"
+            echo
+            echo "| Clip | Decode errors | Size | FPS (r / avg) | Frame spacing | Duration (requested) | Frozen | Changed area | Unique frames | Result |"
             echo "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"
           } > "$summary"
           failed=0
-          for s in ${SCENARIOS//,/ }; do
+          results="$RUNNER_TEMP/results.tsv"
+          : > "$results"
+          while IFS=$'\t' read -r s _ _ requested <&3; do
             clip="clips/$s.mp4"
-            requested="$(cat "$DURATIONS_DIR/$s")"
             if [ ! -s "$clip" ]; then
               echo "::error title=Clip $s failed validation::missing clip"
               echo "| $s | - | - | - | - | - (${requested}s) | - | - | - | FAIL: missing clip |" >> "$summary"
+              printf '%s\t%s\n' "$s" "FAIL: missing clip" >> "$results"
               failed=1
               continue
             fi
@@ -461,12 +566,52 @@ jobs:
               || echo "ffmpeg exited with status $?" >> "$errlog"
             errors="$(grep -c . "$errlog" || true)"
             if [ "$errors" -gt 0 ]; then head -20 "$errlog"; fi
-            if ! python3 "$checker" "$s" "$clip" "$requested" "$errors" >> "$summary"; then failed=1; fi
-          done
+            row="$(python3 "$checker" "$s" "$clip" "$requested" "$errors")" || failed=1
+            echo "$row" >> "$summary"
+            printf '%s\t%s\n' "$s" "$(echo "$row" | awk -F' [|] ' '{print $(NF)}' | sed 's/ *|$//')" >> "$results"
+          done 3< "$CLIPS_TSV"
           {
             echo
             if [ "$failed" -eq 0 ]; then echo "All clips passed."; else echo "**Some clips failed validation.**"; fi
           } >> "$summary"
+          # Manifest next to the videos: seed, scenario, parameters, movement
+          # pattern and validation result per clip (from each PLAN line).
+          python3 - "$CLIPS_TSV" "$results" "$SEED" plans clips/manifest.json <<'PY'
+          import json, os, sys
+          tsv, results_path, base, plans, out = sys.argv[1:6]
+          results = {}
+          for line in open(results_path):
+              if "\t" in line:
+                  cid, res = line.rstrip("\n").split("\t", 1)
+                  results[cid] = res
+          clips = []
+          for line in open(tsv):
+              parts = line.rstrip("\n").split("\t")
+              if len(parts) < 4:
+                  continue
+              cid, scenario, seed, seconds = parts[:4]
+              plan = {}
+              path = os.path.join(plans, cid + ".json")
+              if os.path.exists(path):
+                  try:
+                      plan = json.load(open(path))
+                  except ValueError:
+                      plan = {}
+              clips.append({
+                  "file": cid + ".mp4",
+                  "scenario": scenario,
+                  "seed": int(seed),
+                  "durationSeconds": int(seconds),
+                  "key": plan.get("key"),
+                  "requested": plan.get("requested"),
+                  "parameters": plan.get("params", {}),
+                  "movement": plan.get("movement", {}),
+                  "validation": results.get(cid, "not validated"),
+              })
+          json.dump({"baseSeed": int(base), "clips": clips}, open(out, "w"), indent=2, sort_keys=True)
+          print(f"manifest: {len(clips)} clips -> {out}")
+          PY
+          cp clips/manifest.json validation/manifest.json
           cp raw/*.director.log validation/ 2>/dev/null || true
           cat "$summary"
           cat "$summary" >> "$GITHUB_STEP_SUMMARY"
@@ -489,7 +634,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: rejected-clips
-          path: clips/*.mp4
+          path: |
+            clips/*.mp4
+            clips/manifest.json
           retention-days: 1
           if-no-files-found: ignore
 
@@ -497,6 +644,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: scenario-clips
-          path: clips/*.mp4
+          path: |
+            clips/*.mp4
+            clips/manifest.json
           retention-days: 1
           if-no-files-found: error

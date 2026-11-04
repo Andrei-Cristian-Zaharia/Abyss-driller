@@ -16,7 +16,8 @@ Debug builds can start straight into a scripted scenario with an autopilot thumb
 
 Launch arguments:
 
-- `-scenario <name>` — one of the names above.
+- `-scenario <name>` — one of the names above, or `random` (the seed picks one).
+- `-scenarioSeed <number>` — seeds the moment (biome, depth, boss and its HP, rig, perks, fuel, coins, events, early dig / mid run / near death / overdrive), the shaft and the autopilot's moves (zig-zags, dives, sweeps, swirls, hooks, bursts, short lifts). The same seed gives the same set-up and move plan; without one, the clock picks it.
 - `-scenarioDuration <seconds>` — how long the autopilot plays (default 20); afterwards the app just idles.
 - `-scenarioLayer <index>` — `deepBiome` only: which `Strata.layers` index to jump to.
 - `-scenarioBoss <index>` — `bossFight` only: which boss in the boss order to fight.
@@ -34,9 +35,11 @@ xcrun simctl io booted recordVideo --codec=h264 goldRush.mp4   # Ctrl-C to stop
 
 ### Recording in GitHub Actions
 
-`.github/workflows/record-scenarios.yml` builds the Debug app for the iOS Simulator on a macOS runner, records each scenario and uploads the clips as one artifact, `scenario-clips` (`<scenario>.mp4`, kept for 1 day). It only runs when triggered by hand:
+`.github/workflows/record-scenarios.yml` builds the Debug app for the iOS Simulator on a macOS runner, records each scenario and uploads the clips as one artifact, `scenario-clips` (`<scenario>_seed<seed>.mp4` plus `manifest.json`, kept for 1 day). It only runs when triggered by hand:
 
-- GitHub → Actions → **Record scenarios** → **Run workflow**, optionally setting `scenarios` (comma-separated, default `all`) and `duration` (seconds, default 20).
-- Or: `gh workflow run record-scenarios.yml -f scenarios=bossFight,goldRush -f duration=15`
+- GitHub → Actions → **Record scenarios** → **Run workflow**, optionally setting `scenario` (`random` by default, one type, a comma list, or `all`), `count` (clips, default 5), `seed` (blank = a new seed every run) and `duration`.
+- Or: `gh workflow run record-scenarios.yml -f scenario=random -f count=5` (reproduce one clip: `-f seed=<its seed> -f count=1 -f scenario=<same scenario input>`).
+
+Each run logs its base seed (a notice on the run page); clip *i* uses seed + *i* and is named `<scenario>_seed<seed>.mp4`. `manifest.json` next to the clips lists every clip's seed, scenario, parameters, movement pattern and validation result. A clip whose scenario + parameters repeat an earlier clip of the same run is re-rolled with another seed before recording (up to 6 times, then skipped).
 
 Download the clips from the run's summary page, or with `gh run download <run-id> -n scenario-clips`.
