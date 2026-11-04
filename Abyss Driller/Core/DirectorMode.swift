@@ -49,6 +49,17 @@ final class Director {
     private var nextEventTime = 0.0
     private var nextScatterTime = 0.0
 
+    // Debug log (stderr; the CI workflow prints it in the Actions log).
+    private var timelineFrames = 0
+    private var renders = 0
+    private var lastRenderFrame: Date?
+    private var logWindowStart: TimeInterval?
+    private var lastLoggedSteps = 0
+    private var lastLoggedDropped = 0.0
+    private var lastLoggedPosition: (x: Double, depth: Double, camera: Double)?
+    private var stuckSeconds = 0
+    private var lastCommand = ""
+
     private init() {
         let defaults = UserDefaults.standard
         scenario = defaults.string(forKey: "scenario").flatMap(Scenario.init(rawValue:))
@@ -64,6 +75,7 @@ final class Director {
     func begin(app: AppModel) {
         guard let scenario, self.app == nil else { return }
         self.app = app
+        log("begin scenario=\(scenario.rawValue) duration=\(duration)s")
         // The duration covers the whole scenario, menus included.
         startTime = Date().timeIntervalSinceReferenceDate
         switch scenario {
@@ -109,7 +121,10 @@ final class Director {
 
     /// Called by `GameView` every frame, before the world ticks.
     func frame(world: GameWorld, now: TimeInterval) {
-        guard let scenario, !finished else { return }
+        guard let scenario else { return }
+        timelineFrames += 1
+        logStatus(world: world, now: now)
+        guard !finished else { return }
         if startTime == nil { startTime = now }
         let t = now - (startTime ?? now)
         let dt = min(0.1, max(0, now - (lastTime ?? now)))
@@ -121,9 +136,14 @@ final class Director {
             stick = nil
             world.isHolding = false
             world.steerVector = nil
+            log(String(format: "t=%.1fs scenario finished, thumb lifted", t))
             return
         }
 
+        // A slow simulator (software rendering, ~15-20 fps) can need more
+        // than 16 fixed steps per frame; catch up to the full 0.25 s the
+        // clock allows so the world keeps real speed on screen.
+        world.maxStepsPerTick = 30
         world.beginIfNeeded()
         if setUpWorld != ObjectIdentifier(world), world.phase == .drilling {
             setUpWorld = ObjectIdentifier(world)
@@ -200,7 +220,9 @@ final class Director {
             world.isHolding = false
             world.steerVector = nil
             if choosingSince == nil { choosingSince = t }
+            command("perk-wait", t: t)
             if let since = choosingSince, t - since > 1.4, let perk = world.perkOffer.randomElement() {
+                log(String(format: "t=%.1fs autopilot: pick perk %@", t, String(describing: perk)))
                 world.choosePerk(perk)
                 choosingSince = nil
             }
@@ -221,6 +243,7 @@ final class Director {
             stick = nil
             world.isHolding = false
             world.steerVector = nil
+            command("lift", t: t)
             return
         }
 
@@ -259,6 +282,67 @@ final class Director {
         stick = vector
         world.isHolding = true
         world.steerVector = vector
+        command(fighting ? "steer-boss" : (goalPoint(scenario, world: world) != nil ? "steer-goal" : "steer-wander"), t: t)
+    }
+
+    // MARK: - Debug log
+
+    /// Called from the world canvas each time it actually draws.
+    func noteRender(frame: Date) {
+        guard isActive else { return }
+        renders += 1
+        lastRenderFrame = frame
+    }
+
+    /// Logs autopilot mode changes (the per-second line carries the stick).
+    private func command(_ kind: String, t: Double) {
+        guard kind != lastCommand else { return }
+        lastCommand = kind
+        log(String(format: "t=%.1fs autopilot: %@", t, kind))
+    }
+
+    /// Once a second: real render fps vs timeline fps, sim steps, pause
+    /// state, drill and camera position, and the stick being held.
+    private func logStatus(world: GameWorld, now: TimeInterval) {
+        guard let start = logWindowStart else { logWindowStart = now; return }
+        let window = now - start
+        guard window >= 1 else { return }
+        let t = now - (startTime ?? now)
+        let steps = world.stepsRun - lastLoggedSteps
+        let dropped = world.droppedTime - lastLoggedDropped
+        let stickText = stick.map { String(format: "(%.2f,%.2f)", $0.dx, $0.dy) } ?? "lifted"
+        let bossText = world.boss.map { b in
+            "\(b.kind) hp=\(b.hp)/\(b.maxHP) engaged=\(b.engaged) defeated=\(b.defeated) at=(\(String(format: "%.1f,%.1f", b.x, b.y)))"
+        } ?? "none"
+        log(String(format: "t=%.1fs renderFps=%.1f timelineFps=%.1f simSteps/s=%.0f dropped=%.2fs "
+                   + "paused=%@ phase=%@ result=%@ bossIntro=%.2f drill=(%.2f, %.2f m) camera=%.2f "
+                   + "holding=%@ stick=%@ boss=%@",
+                   t, Double(renders) / window, Double(timelineFrames) / window, Double(steps) / window, dropped,
+                   String(describing: app?.isPaused ?? false), String(describing: world.phase),
+                   String(describing: app?.result != nil), world.bossIntro,
+                   world.x, world.depth, world.camera,
+                   String(describing: world.isHolding), stickText, bossText))
+        if timelineFrames > 0, renders == 0 {
+            log("WARNING: timeline ticked \(timelineFrames)x but the world canvas did not redraw")
+        }
+        if let last = lastLoggedPosition, world.phase == .drilling, world.isHolding,
+           abs(last.x - world.x) < 0.01, abs(last.depth - world.depth) < 0.01, abs(last.camera - world.camera) < 0.01 {
+            stuckSeconds += 1
+            if stuckSeconds >= 2 { log("WARNING: drill and camera have not moved for \(stuckSeconds)s while holding") }
+        } else {
+            stuckSeconds = 0
+        }
+        lastLoggedPosition = (world.x, world.depth, world.camera)
+        lastLoggedSteps = world.stepsRun
+        lastLoggedDropped = world.droppedTime
+        timelineFrames = 0
+        renders = 0
+        logWindowStart = now
+    }
+
+    /// Unbuffered stderr, so lines reach `simctl launch --stderr` at once.
+    private func log(_ line: String) {
+        FileHandle.standardError.write(Data("[Director] \(line)\n".utf8))
     }
 
     private func goalPoint(_ scenario: Scenario, world: GameWorld) -> CGPoint? {

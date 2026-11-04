@@ -60,6 +60,7 @@ Drive `GameWorld` directly (`setCanvasFrame`, `beginIfNeeded`, `isHolding`, `ste
 **`GameWorld` (Game/GameWorld.swift) is the whole simulation and is deliberately NOT `@Observable`.** The view redraws every frame from a `TimelineView`, so per-property observation would be pure overhead. It follows that:
 
 - `GameView` advances the sim from `.onChange(of: context.date)` inside the `TimelineView`, and the HUD lives *inside* that closure so it refreshes with the canvas.
+- The world `Canvas` is wrapped in `WorldCanvas(world:frame:)`, which takes the timeline date. Keep that: with only the (non-observable) world as input, SwiftUI could skip redrawing the canvas while the HUD kept updating, which froze the world in Director mode recordings.
 - The run ends through the `onEnd` callback, not by the view polling `phase`. `AppModel.startRun` wires it up.
 - `GameRenderer` never mutates `GameWorld`. Keep it that way — it is the only reason frame rendering is safe to reorder.
 
