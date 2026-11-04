@@ -41,6 +41,11 @@ jobs:
       DEFAULT_DURATIONS: bossFight=40,goldRush=35,caveIn=35,deepBiome=30,garageUpgrades=40
       MIN_DURATION: "5"
       MAX_DURATION: "120"
+      # Static-clip rejection (see the validate step): most of a clip frozen,
+      # a scene that changes only in a tiny area, or almost no unique frames.
+      MAX_FROZEN_PCT: "30"
+      MIN_CHANGED_AREA_PCT: "1.0"
+      MIN_UNIQUE_PCT: "25"
     steps:
       - uses: actions/checkout@v4
 
@@ -210,7 +215,13 @@ jobs:
             # The autopilot's clock starts when the app appears, before the
             # recording does; it runs well past the clip, so the recording
             # never catches it winding down.
-            xcrun simctl launch "$UDID" "$BUNDLE_ID" -scenario "$s" -scenarioDuration "$((duration + 12))"
+            # Director mode logs to stderr (render fps, pause state, drill and
+            # camera position every second, autopilot commands); it is
+            # printed below so it shows in the Actions log.
+            applog="$PWD/raw/$s.director.log"
+            : > "$applog"
+            xcrun simctl launch --stderr="$applog" "$UDID" "$BUNDLE_ID" \
+              -scenario "$s" -scenarioDuration "$((duration + 12))"
             sleep 2
             log="raw/$s.log"
             : > "$log"
@@ -239,6 +250,11 @@ jobs:
             cat "$log"
             if [ "$status" -ne 0 ]; then echo "::error::$s: recordVideo exited with $status"; exit 1; fi
             xcrun simctl terminate "$UDID" "$BUNDLE_ID" || true
+            echo "--- Director log ($s) ---"
+            grep '\[Director\]' "$applog" || echo "(no Director output)"
+            if grep -q 'WARNING' "$applog"; then
+              echo "::warning title=Director $s::$(grep -m1 'WARNING' "$applog" | sed 's/^.*\[Director\] //')"
+            fi
             test -s "raw/$s.mp4"
             ls -lh "raw/$s.mp4"
             ffprobe -v error -select_streams v:0 \
@@ -269,7 +285,7 @@ jobs:
             echo "::endgroup::"
           done
 
-      - name: Validate clips (decode, 30 fps CFR, vertical, duration)
+      - name: Validate clips (decode, 30 fps CFR, vertical, duration, not static)
         id: validate
         run: |
           set -euo pipefail
@@ -303,6 +319,7 @@ jobs:
                   return Fraction(0)
 
           size = rates = step = duration = "-"
+          pts = []
           try:
               info = probe("-show_entries",
                            "stream=codec_type,codec_name,pix_fmt,width,height,r_frame_rate,avg_frame_rate,time_base"
@@ -350,8 +367,72 @@ jobs:
           except (subprocess.CalledProcessError, ValueError, KeyError) as e:
               problems.append(f"ffprobe failed: {e}")
 
+          # Static-clip check. A recording where the world layer stopped
+          # redrawing still changes a little (HUD text, the joystick knob),
+          # so the decode/format checks above pass; these do not.
+          #  - freezedetect (noise 0.003, >= 2 s): share of the clip frozen.
+          #  - changed area: per frame, % of pixels whose luma moved by more
+          #    than 10 vs the previous frame; the largest value in each
+          #    second, then the median of those (duplicate frames from a
+          #    slow simulator do not drag it down).
+          #  - mpdecimate: share of frames that differ from the last kept one.
+          import os, re, statistics
+          MAX_FROZEN = float(os.environ.get("MAX_FROZEN_PCT", "30"))
+          MIN_AREA = float(os.environ.get("MIN_CHANGED_AREA_PCT", "1.0"))
+          MIN_UNIQUE = float(os.environ.get("MIN_UNIQUE_PCT", "25"))
+          frozen_txt = area_txt = unique_txt = "-"
+
+          def ffmpeg_filter(vf, level="info", fmt="null"):
+              run = subprocess.run(["ffmpeg", "-hide_banner", "-nostdin", "-v", level, "-i", clip,
+                                    "-map", "0:v:0", "-vf", vf, "-fps_mode", "passthrough", "-f", fmt, "-"],
+                                   capture_output=True, text=True)
+              return run.stdout, run.stderr
+
+          try:
+              clip_len = float(duration.rstrip("s")) if duration != "-" else float(requested)
+              _, err = ffmpeg_filter("freezedetect=n=0.003:d=2")
+              frozen, start = 0.0, None
+              for m in re.finditer(r"freeze_(start|end): ([0-9.]+)", err):
+                  if m.group(1) == "start":
+                      start = float(m.group(2))
+                  elif start is not None:
+                      frozen += float(m.group(2)) - start
+                      print(f"{scenario}: frozen {start:.2f}-{float(m.group(2)):.2f}s", file=sys.stderr)
+                      start = None
+              if start is not None:                      # still frozen at the end
+                  frozen += max(0.0, clip_len - start)
+                  print(f"{scenario}: frozen {start:.2f}s-end", file=sys.stderr)
+              frozen_pct = 100 * frozen / clip_len if clip_len > 0 else 100
+              frozen_txt = f"{frozen_pct:.1f}%"
+              if frozen_pct > MAX_FROZEN:
+                  problems.append(f"static clip: {frozen_txt} frozen (freezedetect n=0.003 d=2), max {MAX_FROZEN:g}%")
+
+              _, err = ffmpeg_filter("format=gray,tblend=all_mode=difference,blackframe=amount=0:threshold=10")
+              per_second = {}
+              for m in re.finditer(r"pblack:(\d+)\S*\s.*?\bt:([0-9.]+)", err):
+                  sec = int(float(m.group(2)))
+                  per_second[sec] = max(per_second.get(sec, 0.0), 100.0 - float(m.group(1)))
+              if per_second:
+                  area = statistics.median(per_second.values())
+                  area_txt = f"{area:.2f}%"
+                  if area < MIN_AREA:
+                      problems.append(f"scene changes only in a tiny area: median {area_txt} of pixels per second, min {MIN_AREA:g}%")
+              else:
+                  problems.append("changed-area analysis produced no data")
+
+              out, _ = ffmpeg_filter("mpdecimate", level="error", fmt="framemd5")
+              kept = sum(1 for line in out.splitlines() if line and not line.startswith("#"))
+              total = len(pts) or kept
+              unique = 100 * kept / total if total else 0
+              unique_txt = f"{unique:.0f}% ({kept}/{total})"
+              if unique < MIN_UNIQUE:
+                  problems.append(f"only {unique_txt} unique frames (mpdecimate), min {MIN_UNIQUE:g}%")
+          except (OSError, ValueError) as e:
+              problems.append(f"motion analysis failed: {e}")
+
           result = "PASS" if not problems else "FAIL: " + "; ".join(problems)
-          print(f"| {scenario} | {decode_errors} | {size} | {rates} | {step} | {duration} ({requested}s) | {result} |")
+          print(f"| {scenario} | {decode_errors} | {size} | {rates} | {step} | {duration} ({requested}s) "
+                f"| {frozen_txt} | {area_txt} | {unique_txt} | {result} |")
           for p in problems:
               print(f"::error title=Clip {scenario} failed validation::{p}", file=sys.stderr)
           sys.exit(1 if problems else 0)
@@ -360,8 +441,8 @@ jobs:
           {
             echo "## Clip validation"
             echo
-            echo "| Scenario | Decode errors | Size | FPS (r / avg) | Frame spacing | Duration (requested) | Result |"
-            echo "| --- | --- | --- | --- | --- | --- | --- |"
+            echo "| Scenario | Decode errors | Size | FPS (r / avg) | Frame spacing | Duration (requested) | Frozen | Changed area | Unique frames | Result |"
+            echo "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"
           } > "$summary"
           failed=0
           for s in ${SCENARIOS//,/ }; do
@@ -369,7 +450,7 @@ jobs:
             requested="$(cat "$DURATIONS_DIR/$s")"
             if [ ! -s "$clip" ]; then
               echo "::error title=Clip $s failed validation::missing clip"
-              echo "| $s | - | - | - | - | - (${requested}s) | FAIL: missing clip |" >> "$summary"
+              echo "| $s | - | - | - | - | - (${requested}s) | - | - | - | FAIL: missing clip |" >> "$summary"
               failed=1
               continue
             fi
@@ -386,6 +467,7 @@ jobs:
             echo
             if [ "$failed" -eq 0 ]; then echo "All clips passed."; else echo "**Some clips failed validation.**"; fi
           } >> "$summary"
+          cp raw/*.director.log validation/ 2>/dev/null || true
           cat "$summary"
           cat "$summary" >> "$GITHUB_STEP_SUMMARY"
           ls -lh clips || true

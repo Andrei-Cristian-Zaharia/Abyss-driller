@@ -414,6 +414,15 @@ final class GameWorld {
 
     // MARK: - Clock
 
+    /// Most fixed steps one frame may run. 16 (0.133 s) on devices; Director
+    /// mode raises it so a slow CI simulator still moves the world at real
+    /// speed instead of silently dropping time.
+    var maxStepsPerTick = 16
+    /// Fixed steps run so far, and simulated time thrown away by the cap
+    /// (read by Director mode's debug log).
+    private(set) var stepsRun = 0
+    private(set) var droppedTime = 0.0
+
     func tick(_ now: TimeInterval) {
         guard let previous = lastTime else { lastTime = now; return }
         lastTime = now
@@ -421,12 +430,16 @@ final class GameWorld {
         accumulator += raw
         let step = 1.0 / 120.0
         var steps = 0
-        while accumulator >= step && steps < 16 {
+        while accumulator >= step && steps < maxStepsPerTick {
             advance(step)
             accumulator -= step
             steps += 1
         }
-        if steps == 16 { accumulator = 0 }
+        stepsRun += steps
+        if steps == maxStepsPerTick, accumulator >= step {
+            droppedTime += accumulator
+            accumulator = 0
+        }
     }
 
     // MARK: - Simulation

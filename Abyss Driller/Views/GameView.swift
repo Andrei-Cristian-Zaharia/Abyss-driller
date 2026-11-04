@@ -21,7 +21,7 @@ struct GameView: View {
         ZStack(alignment: .top) {
             TimelineView(.animation(paused: app.isPaused || app.result != nil)) { context in
                 ZStack(alignment: .top) {
-                    canvas
+                    canvas(frame: context.date)
                     hud
                 }
                 .onChange(of: context.date) { _, _ in
@@ -64,19 +64,22 @@ struct GameView: View {
 
     // MARK: - Play area
 
-    private var canvas: some View {
-        Canvas(opaque: true, rendersAsynchronously: false) { context, size in
-            GameRenderer(world: world, size: size).render(into: context)
-        }
-        .ignoresSafeArea()
-        .onGeometryChange(for: CGRect.self) { proxy in
-            proxy.frame(in: .global)
-        } action: { frame in
-            world.setCanvasFrame(frame)
-        }
-        .overlay { joystick }
-        .gesture(steerGesture)
-        .accessibilityLabel("Drill shaft. Touch and hold to drill, drag in any direction to steer.")
+    /// `frame` is the timeline's date. `GameWorld` is not observable, so
+    /// without a value that changes every frame SwiftUI may see the canvas
+    /// as unchanged and keep the old drawing while the HUD updates (this
+    /// froze the world in Director mode recordings, where no touch state
+    /// changes to force a redraw).
+    private func canvas(frame: Date) -> some View {
+        WorldCanvas(world: world, frame: frame)
+            .ignoresSafeArea()
+            .onGeometryChange(for: CGRect.self) { proxy in
+                proxy.frame(in: .global)
+            } action: { rect in
+                world.setCanvasFrame(rect)
+            }
+            .overlay { joystick }
+            .gesture(steerGesture)
+            .accessibilityLabel("Drill shaft. Touch and hold to drill, drag in any direction to steer.")
     }
 
     /// Hold to drill, drag in any direction to turn the drill that way. The
@@ -401,6 +404,26 @@ struct GameView: View {
                    value: promptPulse)
         .allowsHitTesting(false)
         .onAppear { promptPulse = true }
+    }
+}
+
+// MARK: - World canvas
+
+/// The play area. `frame` changes every timeline tick, so SwiftUI always
+/// sees a new view value and re-runs the renderer; the closure reads it too,
+/// so the Canvas itself is never considered equal to the previous frame.
+private struct WorldCanvas: View {
+    let world: GameWorld
+    let frame: Date
+
+    var body: some View {
+        let frame = frame
+        Canvas(opaque: true, rendersAsynchronously: false) { context, size in
+            #if DEBUG
+            Director.shared.noteRender(frame: frame)
+            #endif
+            GameRenderer(world: world, size: size).render(into: context)
+        }
     }
 }
 
