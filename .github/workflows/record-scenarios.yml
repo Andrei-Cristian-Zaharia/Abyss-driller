@@ -12,9 +12,9 @@ on:
         default: all
         type: string
       duration:
-        description: "Seconds to record per scenario"
+        description: "Seconds per scenario: blank = per-scenario defaults (30-40 s), a number for all (e.g. 35), or overrides (e.g. bossFight=40,caveIn=32)"
         required: false
-        default: "20"
+        default: ""
         type: string
 
 permissions:
@@ -35,6 +35,12 @@ jobs:
       DERIVED_DATA: build/DerivedData
       SOURCE_PACKAGES: build/SourcePackages
       ALL_SCENARIOS: bossFight,goldRush,caveIn,deepBiome,garageUpgrades
+      # Per-scenario clip length in seconds, used when the `duration` input
+      # does not set one. The bossFight needs its intro plus a few powers,
+      # deepBiome just shows the layer.
+      DEFAULT_DURATIONS: bossFight=40,goldRush=35,caveIn=35,deepBiome=30,garageUpgrades=40
+      MIN_DURATION: "5"
+      MAX_DURATION: "120"
     steps:
       - uses: actions/checkout@v4
 
@@ -52,12 +58,41 @@ jobs:
               *) echo "::error::Unknown scenario '$s' (allowed: $ALL_SCENARIOS)"; exit 1 ;;
             esac
           done
-          duration="${IN_DURATION:-20}"
-          if ! [[ "$duration" =~ ^[0-9]+$ ]] || [ "$duration" -lt 3 ] || [ "$duration" -gt 120 ]; then
-            echo "::error::duration must be a whole number of seconds between 3 and 120"; exit 1
+          # One file per scenario holding its clip length in seconds:
+          # defaults first, then the input (a number for all, or s=n pairs).
+          dir="$RUNNER_TEMP/durations"
+          mkdir -p "$dir"
+          set_duration() {
+            local s="$1" d="$2"
+            case ",$ALL_SCENARIOS," in
+              *",$s,"*) ;;
+              *) echo "::error::Unknown scenario '$s' in duration (allowed: $ALL_SCENARIOS)"; exit 1 ;;
+            esac
+            if ! [[ "$d" =~ ^[0-9]+$ ]] || [ "$d" -lt "$MIN_DURATION" ] || [ "$d" -gt "$MAX_DURATION" ]; then
+              echo "::error::Duration for $s must be a whole number of seconds between $MIN_DURATION and $MAX_DURATION (got '$d')"; exit 1
+            fi
+            echo "$d" > "$dir/$s"
+          }
+          for kv in ${DEFAULT_DURATIONS//,/ }; do set_duration "${kv%%=*}" "${kv#*=}"; done
+          duration="$(echo "${IN_DURATION:-}" | tr -d '[:space:]')"
+          if [ -n "$duration" ] && [ "$duration" != "default" ]; then
+            if [[ "$duration" =~ ^[0-9]+$ ]]; then
+              for s in ${ALL_SCENARIOS//,/ }; do set_duration "$s" "$duration"; done
+            else
+              for kv in ${duration//,/ }; do
+                [[ "$kv" == *=* ]] || { echo "::error::duration '$kv' is not a number or scenario=seconds"; exit 1; }
+                set_duration "${kv%%=*}" "${kv#*=}"
+              done
+            fi
           fi
+          echo "| Scenario | Seconds |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| --- | --- |" >> "$GITHUB_STEP_SUMMARY"
+          for s in ${scenarios//,/ }; do
+            echo "$s: $(cat "$dir/$s") s"
+            echo "| $s | $(cat "$dir/$s") |" >> "$GITHUB_STEP_SUMMARY"
+          done
           echo "SCENARIOS=$scenarios" >> "$GITHUB_ENV"
-          echo "DURATION=$duration" >> "$GITHUB_ENV"
+          echo "DURATIONS_DIR=$dir" >> "$GITHUB_ENV"
 
       - name: Select newest Xcode
         id: xcode
@@ -169,11 +204,13 @@ jobs:
           set -m
           mkdir -p raw
           for s in ${SCENARIOS//,/ }; do
-            echo "::group::$s"
+            duration="$(cat "$DURATIONS_DIR/$s")"
+            echo "::group::$s (${duration}s)"
             xcrun simctl terminate "$UDID" "$BUNDLE_ID" 2>/dev/null || true
-            # The autopilot runs a few seconds past the clip, so the recording
+            # The autopilot's clock starts when the app appears, before the
+            # recording does; it runs well past the clip, so the recording
             # never catches it winding down.
-            xcrun simctl launch "$UDID" "$BUNDLE_ID" -scenario "$s" -scenarioDuration "$((DURATION + 6))"
+            xcrun simctl launch "$UDID" "$BUNDLE_ID" -scenario "$s" -scenarioDuration "$((duration + 12))"
             sleep 2
             log="raw/$s.log"
             : > "$log"
@@ -186,7 +223,7 @@ jobs:
               sleep 0.1
             done
             # One spare second; the encode step trims to the exact duration.
-            sleep "$((DURATION + 1))"
+            sleep "$((duration + 1))"
             # SIGINT makes simctl finalize the MP4; wait for it to finish
             # writing (up to 60 s) instead of killing it.
             kill -INT "$rec"
@@ -219,9 +256,10 @@ jobs:
           vf="fps=30,scale=1080:1920:force_original_aspect_ratio=decrease:flags=lanczos"
           vf="$vf,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,format=yuv420p"
           for s in ${SCENARIOS//,/ }; do
-            echo "::group::$s"
+            duration="$(cat "$DURATIONS_DIR/$s")"
+            echo "::group::$s (${duration}s)"
             ffmpeg -hide_banner -v error -y -i "raw/$s.mp4" \
-              -t "$DURATION" -vf "$vf" -fps_mode cfr -r 30 \
+              -t "$duration" -vf "$vf" -fps_mode cfr -r 30 \
               -c:v libx264 -preset medium -crf 18 -profile:v high -pix_fmt yuv420p \
               -g 60 -an -sn -dn -map_metadata -1 -movflags +faststart \
               "clips/$s.mp4"
@@ -230,6 +268,16 @@ jobs:
               -of default=noprint_wrappers=1 "clips/$s.mp4"
             echo "::endgroup::"
           done
+
+      - name: Check every scenario has a clip
+        run: |
+          set -euo pipefail
+          missing=0
+          for s in ${SCENARIOS//,/ }; do
+            if [ ! -s "clips/$s.mp4" ]; then echo "::error::Missing clip for $s"; missing=1; fi
+          done
+          ls -lh clips
+          exit "$missing"
 
       - name: Upload clips
         uses: actions/upload-artifact@v4

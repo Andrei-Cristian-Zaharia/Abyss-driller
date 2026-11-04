@@ -6,7 +6,7 @@ import SwiftUI
 // Scripted scenarios for recording gameplay footage, e.g. in CI:
 //
 //   -scenario bossFight|goldRush|caveIn|deepBiome|garageUpgrades
-//   -scenarioDuration 20        seconds of autopilot, then the app idles
+//   -scenarioDuration 35        seconds of autopilot, then the app idles
 //   -scenarioLayer 9            deepBiome: which `Strata.layers` index (default: the last)
 //   -scenarioBoss 3             bossFight: which boss index (default: Crystal Golem)
 //
@@ -53,7 +53,7 @@ final class Director {
         let defaults = UserDefaults.standard
         scenario = defaults.string(forKey: "scenario").flatMap(Scenario.init(rawValue:))
         let seconds = defaults.double(forKey: "scenarioDuration")
-        duration = seconds > 0 ? seconds : 20
+        duration = seconds > 0 ? seconds : 35
         layerChoice = defaults.object(forKey: "scenarioLayer") != nil ? defaults.integer(forKey: "scenarioLayer") : nil
         bossChoice = defaults.object(forKey: "scenarioBoss") != nil ? defaults.integer(forKey: "scenarioBoss") : nil
     }
