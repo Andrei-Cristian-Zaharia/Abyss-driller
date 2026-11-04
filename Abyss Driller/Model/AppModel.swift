@@ -71,7 +71,11 @@ final class AppModel {
         // The daily stays fair: everyone gets the standard rig and build.
         let loadout = daily ? Loadout.dailyStandard : profile.runLoadout
         let gear = daily ? Gear.standard : profile.gear
-        let seed = daily ? DailyChallenge.todaySeed : UInt64.random(in: 1...UInt64.max)
+        var seed = daily ? DailyChallenge.todaySeed : UInt64.random(in: 1...UInt64.max)
+        #if DEBUG
+        // Director mode: the clip's seed also picks the shaft (Core/DirectorMode.swift).
+        if !daily, let directed = Director.shared.terrainSeed { seed = directed }
+        #endif
 
         let world = GameWorld(loadout: loadout,
                               levels: levels,
