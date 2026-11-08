@@ -219,6 +219,9 @@ final class Director {
 
     // MARK: - Rolling a moment
 
+    /// Perks that put plates back on screen (+1 ARMOUR / +2 plates mid-clip).
+    static let healingPerks: Set<Perk> = [.autoRepair, .plating]
+
     private static func roll(_ scenario: Scenario, rng: inout SeededRandom, duration: Double,
                              layer: Int?, boss: Int?) -> DirectorPlan {
         let lastLayer = Strata.layers.count - 1
@@ -240,7 +243,8 @@ final class Director {
             plan.coins = rng.int(400...3_500)
         case .nearDeath:
             plan.fuelFraction = rng.double(0.18...0.3)
-            plan.armorLeft = 2
+            // One hit from the floor `keepAlive` guards: low and tense, never a wreck.
+            plan.armorLeft = 3
             plan.coins = rng.int(800...5_000)
         case .overdriveCombo:
             plan.fuelFraction = rng.double(0.6...1)
@@ -253,7 +257,8 @@ final class Director {
         case .nearDeath: perkCount = rng.int(0...2)
         case .overdriveCombo: perkCount = rng.int(1...2)
         }
-        var pool = Perk.allCases.filter { $0.maxStacks > 0 }
+        // No Auto-Repair: footage never shows the hull healing.
+        var pool = Perk.allCases.filter { $0.maxStacks > 0 && !Self.healingPerks.contains($0) }
         if moment == .overdriveCombo, rng.chance(0.6) {
             plan.perks.append(.overcharge)
             pool.removeAll { $0 == .overcharge }
@@ -508,8 +513,16 @@ final class Director {
             world.setPhase(.choosing)
             world.choosePerk(perk)
         }
+        // A bigger tank and a thicker hull from the first frame, so the bars
+        // drain slowly and the clip never needs a visible top-up.
+        world.loadout.fuelCapacity *= 1.6
         world.fuel = world.loadout.fuelCapacity * plan.fuelFraction
-        if let armor = plan.armorLeft { setArmor(min(armor, world.loadout.armor), in: world) }
+        if let armor = plan.armorLeft {
+            setArmor(min(armor, world.loadout.armor), in: world)
+        } else {
+            world.loadout.armor = max(world.loadout.armor * 3 / 2, 18)
+            setArmor(world.loadout.armor, in: world)
+        }
         world.coins += plan.coins
 
         switch scenario {
@@ -529,16 +542,17 @@ final class Director {
         log(String(format: "t=%.1fs set up %@ (%@) at %.0f m", t, scenario.rawValue, plan.moment.rawValue, world.depth))
     }
 
-    /// Footage should never end on a wreck or an empty tank. A near-death
-    /// clip stays low (blinking fuel, one hit from the end) but survives.
+    /// Footage never ends on a wreck or an empty tank, and never shows a
+    /// repair: the bars only ever go down. Once the hull is one worst-case hit
+    /// from the end, the drill quietly shrugs off further hits (`invuln` is
+    /// not drawn), and fuel stops draining at a floor instead of jumping back
+    /// to full. A near-death clip starts right above that floor.
     private func keepAlive(_ world: GameWorld, plan: DirectorPlan) {
-        if plan.moment == .nearDeath {
-            if world.fuelFraction < 0.1 { world.fuel = world.loadout.fuelCapacity * 0.25 }
-            if world.armor <= 1 { setArmor(min(2, world.loadout.armor), in: world) }
-        } else {
-            if world.fuelFraction < 0.4 { world.fuel = world.loadout.fuelCapacity }
-            if world.armor <= 2 { setArmor(world.loadout.armor, in: world) }
-        }
+        let worstHit = 2 + world.gear.extraDamage          // a geode, plus a heavy part
+        if world.armor <= worstHit { world.invuln = max(world.invuln, 0.25) }
+        if world.armor < 1 { setArmor(1, in: world) }       // last resort, should not happen
+        let fuelFloor = plan.moment == .nearDeath ? 0.12 : 0.3
+        if world.fuelFraction < fuelFloor { world.fuel = world.loadout.fuelCapacity * fuelFloor }
         if world.phase == .stalled {
             world.refillUsed = false
             world.refuelAndResume()
@@ -592,7 +606,10 @@ final class Director {
             if choosingSince == nil { choosingSince = t }
             command("perk-wait", t: t)
             if let since = choosingSince, t - since > plan.perkThink, !world.perkOffer.isEmpty {
-                let perk = world.perkOffer[liveRNG.int(0...(world.perkOffer.count - 1))]
+                // Skip the healing perks when there is anything else on offer.
+                let offer = world.perkOffer.filter { !Self.healingPerks.contains($0) }
+                let choices = offer.isEmpty ? world.perkOffer : offer
+                let perk = choices[liveRNG.int(0...(choices.count - 1))]
                 log(String(format: "t=%.1fs autopilot: pick perk %@", t, perk.rawValue))
                 world.choosePerk(perk)
                 choosingSince = nil
@@ -678,6 +695,10 @@ final class Director {
             goal -= (delta >= 0 ? 1 : -1) * 1.0 * (1 - along / 5)
         }
 
+        // Read the threats like a good player: smash what the bit can kill,
+        // meet shots with the bit, and sidestep everything else.
+        goal += threatSteer(world: world)
+
         // Stuck (holding but not moving): turn away for a moment.
         if let check = progressCheck {
             if t - check.t >= 0.6 {
@@ -709,6 +730,52 @@ final class Director {
         world.isHolding = true
         world.steerVector = vector
         command(targetKind, t: t)
+    }
+
+    /// Heading correction (radians) from what is about to touch the drill:
+    /// critters the bit can kill pull the aim onto them (a SMASH on screen),
+    /// tougher ones push it away; hostile shots closing in are parried with
+    /// the bit when they come from the front, dodged when they do not; lava,
+    /// frost and poison pools ahead are steered round.
+    private func threatSteer(world: GameWorld) -> Double {
+        var turn = 0.0
+        func bearing(_ x: Double, _ y: Double) -> (delta: Double, distance: Double) {
+            let rx = x - world.x
+            let ry = y - world.depth
+            return (remainder(atan2(-rx, ry) - world.heading, 2 * .pi), hypot(rx, ry))
+        }
+        let sense = 5.5
+        for enemy in world.enemies where enemy.awake && !enemy.dead && enemy.surfaced {
+            let (delta, distance) = bearing(enemy.x, enemy.y)
+            guard distance < sense else { continue }
+            let weight = 1 - distance / sense
+            if world.inOverdrive || enemy.isKillable(power: world.loadout.power) {
+                if abs(delta) < 1.2 { turn += delta * 0.6 * weight }
+            } else if abs(delta) < 1.6 {
+                turn -= (delta >= 0 ? 1 : -1) * 1.1 * weight
+            }
+        }
+        let shotSense = 4.5
+        for shot in world.shots where !shot.friendly && shot.life > 0 {
+            let (delta, distance) = bearing(shot.x, shot.y)
+            guard distance < shotSense else { continue }
+            // Only shots moving toward the drill matter.
+            let closing = -((shot.x - world.x) * shot.vx + (shot.y - world.depth) * shot.vy) / max(0.01, distance)
+            guard closing > 0 else { continue }
+            let weight = 1 - distance / shotSense
+            if abs(delta) < 0.9, shot.style != .spore {
+                turn += delta * 0.8 * weight
+            } else {
+                turn -= (delta >= 0 ? 1 : -1) * 0.9 * weight
+            }
+        }
+        for pool in world.lavaPools {
+            let (delta, distance) = bearing(pool.x, pool.y)
+            let gap = distance - pool.radius
+            guard gap < 3.5, pool.y > world.depth - 1, abs(delta) < 1.3 else { continue }
+            turn -= (delta >= 0 ? 1 : -1) * (1 - max(0, gap) / 3.5)
+        }
+        return max(-1.6, min(1.6, turn))
     }
 
     private func lift(_ world: GameWorld) {
