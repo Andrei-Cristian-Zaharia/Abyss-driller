@@ -155,27 +155,7 @@ struct GameView: View {
             }
             .allowsHitTesting(false)
         }
-        #if DEBUG
-        // Director mode's autopilot thumb, drawn like the real stick.
-        if stickOrigin == nil, Director.shared.isActive, app.settings.showJoystick,
-           let stick = Director.shared.stick {
-            let size = world.viewportSize
-            let anchor = Director.shared.stickAnchor
-            let origin = CGPoint(x: size.width * anchor.x, y: size.height * anchor.y)
-            ZStack {
-                Circle()
-                    .stroke(Palette.textPrimary.opacity(0.22), lineWidth: 2)
-                    .background(Circle().fill(Palette.background.opacity(0.18)))
-                    .frame(width: stickRadius * 2, height: stickRadius * 2)
-                    .position(origin)
-                Circle()
-                    .fill(Palette.textPrimary.opacity(0.32))
-                    .frame(width: 34, height: 34)
-                    .position(x: origin.x + stick.dx * stickRadius, y: origin.y + stick.dy * stickRadius)
-            }
-            .allowsHitTesting(false)
-        }
-        #endif
+        // Director mode's autopilot is not drawn: recordings show the gameplay only.
     }
 
     // MARK: - HUD

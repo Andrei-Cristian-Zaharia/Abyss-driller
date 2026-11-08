@@ -149,10 +149,8 @@ final class Director {
     var terrainSeed: UInt64? { isActive ? stableSeed("terrain:\(seed)") | 1 : nil }
 
     /// Joystick deflection the autopilot is holding (unit length at most),
-    /// or nil when the thumb is "lifted". `GameView` draws it like a real stick.
+    /// or nil when the thumb is "lifted". Logged only; recordings do not draw it.
     private(set) var stick: CGVector?
-    /// Where the autopilot's thumb rests, as a fraction of the play area.
-    private(set) var stickAnchor = CGPoint(x: 0.5, y: 0.78)
 
     private(set) var plan: DirectorPlan?
     /// Choices made during play (dodge sides, escapes) come from their own
@@ -181,6 +179,9 @@ final class Director {
     private var progressCheck: (t: Double, x: Double, depth: Double)?
     private var escapeUntil = 0.0
     private var escapeSide = 1.0
+    private var huntID: Int?
+    private var huntSince = 0.0
+    private var ignoredPrey: Set<Int> = []
 
     // Debug log (stderr; the CI workflow prints it in the Actions log).
     private var timelineFrames = 0
@@ -271,7 +272,8 @@ final class Director {
         case .bossFight:
             plan.boss = boss ?? rng.int(0...lastLayer)
             plan.bossHP = rng.pick(["full", "full", "enraged", "lastLegs"])
-            plan.approach = rng.double(7...11)
+            // Far enough above the arena to dig and fight a few critters first.
+            plan.approach = rng.double(14...22)
         case .goldRush:
             plan.layer = layer ?? rng.int(1...lastLayer)
             plan.depthOffset = rng.double(4...40)
@@ -673,7 +675,7 @@ final class Director {
             // A goal (boss, ore) wins; the move only adds a small weave.
             let toward = atan2(-(target.x - world.x), target.y - world.depth)
             goal = toward + 0.25 * sin(u * move.freq + move.phase)
-            targetKind = fighting ? (t < dodgeUntil ? "boss-dodge" : "steer-boss") : "steer-goal"
+            targetKind = fighting ? (t < dodgeUntil ? "boss-circle" : "steer-boss") : (huntID != nil ? "hunt" : "steer-goal")
         }
 
         // Keep off the walls.
@@ -884,18 +886,25 @@ final class Director {
                                y: boss.y - boss.radius - plan.circleRadius * 0.6)
             }
             lastGuard = false
-            // Now and then back off to one side, as if dodging, then go in again.
+            // Critters in the arena first, like a player clearing the way.
+            if let prey = prey(in: world, t: t, range: 6) { return prey }
+            // Fight in passes, never a straight dive: circle the boss looking
+            // for an opening, then cut in from the side, then circle again.
             if t >= nextDodge {
-                dodgeUntil = t + plan.dodgeFor * liveRNG.double(0.7...1.3)
-                nextDodge = dodgeUntil + plan.dodgeEvery * liveRNG.double(0.6...1.4)
+                dodgeUntil = t + plan.dodgeEvery * 0.6 * liveRNG.double(0.7...1.3)   // circling
+                nextDodge = dodgeUntil + plan.dodgeFor * 2 * liveRNG.double(0.7...1.3) // the strike
                 dodgeSide = liveRNG.chance(0.5) ? 1 : -1
             }
             if t < dodgeUntil {
-                let x = min(max(world.x + dodgeSide * 3, 1.2), GameWorld.shaftWidth - 1.2)
-                return CGPoint(x: x, y: min(world.depth, boss.y) - 1.5)
+                let r = boss.radius + plan.circleRadius
+                let angle = atan2(world.x - boss.x, world.depth - boss.y) + dodgeSide * 1.3
+                return CGPoint(x: min(max(boss.x + sin(angle) * r, 1.2), GameWorld.shaftWidth - 1.2),
+                               y: boss.y + cos(angle) * r)
             }
             return CGPoint(x: boss.x, y: boss.y)
         }
+        // On the way down: hunt the critters the bit can kill.
+        if let prey = prey(in: world, t: t, range: 8) { return prey }
         if scenario == .goldRush || plan.moment == .overdriveCombo {
             let near = world.pickups
                 .filter { !$0.collected && $0.y > world.depth - 0.5 && $0.y < world.depth + 9 }
@@ -903,6 +912,25 @@ final class Director {
             if let near { return CGPoint(x: near.x, y: near.y) }
         }
         return nil
+    }
+
+    /// The nearest critter the bit can kill within `range` (not far above the
+    /// drill). A chase that drags on (a bat that keeps fleeing) is dropped
+    /// after a few seconds and that critter is left alone.
+    private func prey(in world: GameWorld, t: Double, range: Double) -> CGPoint? {
+        let target = world.enemies
+            .filter { $0.awake && !$0.dead && $0.surfaced && !ignoredPrey.contains($0.id)
+                && (world.inOverdrive || $0.isKillable(power: world.loadout.power))
+                && $0.y > world.depth - 3 && hypot($0.x - world.x, $0.y - world.depth) < range }
+            .min { hypot($0.x - world.x, $0.y - world.depth) < hypot($1.x - world.x, $1.y - world.depth) }
+        guard let target else { huntID = nil; return nil }
+        if huntID != target.id { huntID = target.id; huntSince = t }
+        if t - huntSince > 3.5 {
+            ignoredPrey.insert(target.id)
+            huntID = nil
+            return nil
+        }
+        return CGPoint(x: target.x, y: target.y)
     }
 
     // MARK: - Cheats
